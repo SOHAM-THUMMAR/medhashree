@@ -3,19 +3,23 @@ import MainLayout from "./layouts/MainLayout";
 import AuthLayout from "./layouts/AuthLayout";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import ExplorePage from "./features/quiz/pages/ExplorePage";
 
 export default function App() {
   return (
     <Routes>
-      {/* Auth Routes */}
+
+      {/* Auth Layout */}
       <Route element={<AuthLayout />}>
-        <Route path="/login" element={<Login />} />
+        <Route path="login" element={<Login />} />
       </Route>
 
-      {/* Main App Routes */}
+      {/* Main Layout */}
       <Route element={<MainLayout />}>
-        <Route path="/" element={<Home />} />
+        <Route index element={<Home />} />
+        <Route path="explore" element={<ExplorePage />} />
       </Route>
+
     </Routes>
   );
 }
