@@ -1,0 +1,153 @@
+name: Medhashree CI Quality & Security Pipeline
+
+on:
+  push:
+    branches: [ main, master, dev ]
+  pull_request:
+    branches: [ main, master, dev ]
+
+jobs:
+  # -------------------------------------------------------------
+  # Job 1: Syntax, Lint, and Build Check
+  # -------------------------------------------------------------
+  lint-and-build:
+    name: Syntax & Lint Checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
+
+      # Install & Lint Backend
+      - name: Install Backend Dependencies
+        working-directory: ./backend
+        run: npm ci
+
+      - name: Lint Backend
+        working-directory: ./backend
+        run: npm run lint
+
+      # Install & Lint & Build Frontend
+      - name: Install Frontend Dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Lint Frontend
+        working-directory: ./frontend
+        run: npm run lint
+
+      - name: Build Frontend (React + Vite)
+        working-directory: ./frontend
+        run: npm run build
+
+  # -------------------------------------------------------------
+  # Job 2: Code Quality, Duplication & Dependency Check
+  # -------------------------------------------------------------
+  code-quality:
+    name: Code Quality & Maintenance Checks
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Check for Code Duplication (jscpd)
+        run: |
+          echo "=== RUNNING CODE DUPLICATION CHECK (jscpd) ==="
+          npx jscpd --min-tokens 80 --min-lines 15 frontend/src backend/controllers backend/routes backend/services backend/models
+
+      - name: Check for Unused Dependencies (depcheck)
+        run: |
+          echo "=== RUNNING UNUSED DEPENDENCY CHECK ==="
+          echo "--- Frontend ---"
+          npx depcheck ./frontend --ignores="postcss,tailwindcss,autoprefixer,@eslint/js,eslint-plugin-react-hooks,eslint-plugin-react-refresh,globals" || true
+          echo "--- Backend ---"
+          npx depcheck ./backend --ignores="@eslint/js,globals,nodemon" || true
+
+  # -------------------------------------------------------------
+  # Job 3: Security & Hackability Scans
+  # -------------------------------------------------------------
+  security-audit:
+    name: Security & Vulnerability Audits
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # Dependency vulnerability check
+      - name: Audit Backend Dependencies
+        working-directory: ./backend
+        run: npm audit --audit-level=high
+
+      - name: Audit Frontend Dependencies
+        working-directory: ./frontend
+        run: npm audit --audit-level=high
+
+      # Secrets scanner
+      - name: Scan Code for Leaked Secrets & Credentials
+        run: node scripts/security-check.js
+
+  # -------------------------------------------------------------
+  # Job 4: GitHub Native CodeQL Security Analysis (SAST)
+  # -------------------------------------------------------------
+  codeql-analysis:
+    name: CodeQL Security Analysis
+    runs-on: ubuntu-latest
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # -------------------------------------------------------------
+  # Job 5: SEO and Accessibility Check
+  # -------------------------------------------------------------
+  seo-audit:
+    name: SEO & Semantic HTML Audit
+    runs-on: ubuntu-latest
+    needs: lint-and-build
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run SEO and Semantic Validator
+        run: node scripts/seo-check.js

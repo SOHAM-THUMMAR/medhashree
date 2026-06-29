@@ -125,13 +125,17 @@
   "scripts": {
     "test": "echo \"No active backend tests.\" && exit 0",
     "start": "node server.js",
-    "dev": "nodemon server.js"
+    "dev": "nodemon server.js",
+    "lint": "eslint ."
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "devDependencies": {
+    "@eslint/js": "^9.39.1",
+    "eslint": "^9.39.1",
+    "globals": "^16.5.0",
     "morgan": "^1.10.1",
     "nodemon": "^3.1.14"
   }
