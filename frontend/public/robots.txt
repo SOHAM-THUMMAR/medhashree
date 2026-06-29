@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# Block admin routes (hash-based, but good practice)
+Disallow: /admin
+
+# Sitemap
+Sitemap: https://medhashree.com/sitemap.xml

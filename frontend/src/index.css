@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --brand-dark: 248 250 252; /* slate-50 */
+    --brand-surface: 255 255 255; /* white */
+    --brand-surface-alt: 241 245 249; /* slate-100 */
+    --brand-indigo-dark: 224 231 255; /* indigo-100 */
+  }
+
+  .dark {
+    --brand-dark: 11 18 32; /* #0b1220 */
+    --brand-surface: 26 29 48; /* #1a1d30 */
+    --brand-surface-alt: 27 34 48; /* #1b2230 */
+    --brand-indigo-dark: 30 27 75; /* #1e1b4b */
+  }
+  
+  body {
+    background-color: rgb(var(--brand-dark));
+    color: rgb(15 23 42); /* slate-900 */
+  }
+  
+  .dark body {
+    color: rgb(255 255 255);
+  }
+}

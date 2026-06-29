@@ -1,0 +1,16 @@
+# Node server
+.env
+node_modules
+uploads
+
+# Client
+client/.env
+client/node_modules
+client/dist
+
+# General
+.DS_Store
+*.log
+
+# dot_net_server
+dot_net_server/.env
