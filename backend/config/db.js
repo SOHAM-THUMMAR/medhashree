@@ -387,20 +387,191 @@ const schemaQueries = [
   )`
 ];
 
+const path = require('path');
+const fs = require('fs');
+
+let activeEngine = 'pg'; // 'pg' or 'sqlite'
+let sqliteDb = null;
+
+// Helper to run query against SQLite fallback engine
+function runSqliteQuery(sql, params = []) {
+  return new Promise((resolve, reject) => {
+    let convertedSql = sql.replace(/\$(\d+)/g, '?');
+    
+    // Clean PostgreSQL specific DDL if present
+    convertedSql = convertedSql
+      .replace(/SERIAL PRIMARY KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
+      .replace(/JSONB/gi, 'TEXT')
+      .replace(/DECIMAL\(\d+,\d+\)/gi, 'REAL')
+      .replace(/BOOLEAN DEFAULT TRUE/gi, 'INTEGER DEFAULT 1')
+      .replace(/BOOLEAN DEFAULT FALSE/gi, 'INTEGER DEFAULT 0')
+      .replace(/IS TRUE/gi, '= 1')
+      .replace(/IS FALSE/gi, '= 0');
+
+    const trimmed = convertedSql.trim().toUpperCase();
+    if (trimmed.startsWith('SELECT') || trimmed.startsWith('PRAGMA') || trimmed.startsWith('EXPLAIN')) {
+      sqliteDb.all(convertedSql, params, (err, rows) => {
+        if (err) return reject(err);
+        resolve({ rows: rows || [], rowCount: rows ? rows.length : 0 });
+      });
+    } else {
+      sqliteDb.run(convertedSql, params, function (err) {
+        if (err) return reject(err);
+        resolve({ rows: [], rowCount: this.changes || 0, insertId: this.lastID });
+      });
+    }
+  });
+}
+
+// Unified query exporter
+const executeQuery = (text, params) => {
+  if (activeEngine === 'sqlite') {
+    return runSqliteQuery(text, params);
+  }
+  return pool.query(text, params);
+};
+
+// SQLite Initialization Helper
+const initializeSqliteFallback = async () => {
+  activeEngine = 'sqlite';
+  const sqlite3 = require('sqlite3').verbose();
+  const dataDir = path.join(__dirname, '../data');
+  if (!fs.existsSync(dataDir)) {
+    fs.mkdirSync(dataDir, { recursive: true });
+  }
+
+  const dbPath = path.join(dataDir, 'medhashree_local.db');
+  console.log(`\n⚡ [DB FALLBACK] Activating Local SQLite Engine: ${dbPath}`);
+
+  sqliteDb = new sqlite3.Database(dbPath);
+
+  // Enable WAL mode & foreign keys
+  await runSqliteQuery('PRAGMA journal_mode = WAL;');
+  await runSqliteQuery('PRAGMA foreign_keys = ON;');
+
+  // Create tables in SQLite
+  const sqliteTables = [
+    `CREATE TABLE IF NOT EXISTS site_settings (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS users (
+      user_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      full_name TEXT NOT NULL,
+      email TEXT UNIQUE NOT NULL,
+      username TEXT UNIQUE NOT NULL,
+      password_hash TEXT NOT NULL,
+      role TEXT NOT NULL DEFAULT 'student',
+      profile_picture TEXT,
+      country TEXT DEFAULT 'INDIA',
+      total_points INTEGER DEFAULT 0,
+      total_quizzes INTEGER DEFAULT 0,
+      global_rank INTEGER,
+      current_streak INTEGER DEFAULT 0,
+      highest_streak INTEGER DEFAULT 0,
+      average_score REAL DEFAULT 0.00,
+      win_rate REAL DEFAULT 0.00,
+      time_played_min INTEGER DEFAULT 0,
+      completion_rate REAL DEFAULT 0.00,
+      best_category TEXT,
+      fav_category TEXT,
+      weakest_category TEXT,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS categories (
+      category_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT UNIQUE NOT NULL,
+      description TEXT,
+      gradient_from TEXT,
+      gradient_to TEXT,
+      border_color TEXT,
+      is_active INTEGER DEFAULT 1,
+      sort_order INTEGER DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS password_resets (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+      otp TEXT NOT NULL,
+      expires_at DATETIME NOT NULL,
+      is_used INTEGER DEFAULT 0
+    )`,
+
+    `CREATE TABLE IF NOT EXISTS activity_logs (
+      log_id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+      username TEXT,
+      role TEXT,
+      action TEXT NOT NULL,
+      method TEXT,
+      endpoint TEXT,
+      ip_address TEXT,
+      user_agent TEXT,
+      status_code INTEGER,
+      severity TEXT DEFAULT 'info',
+      details TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`
+  ];
+
+  for (const q of sqliteTables) {
+    await runSqliteQuery(q);
+  }
+
+  // Seed default admin users
+  const adminEmails = ['sohamthummar04@gmail.com', 'sohamthummae04@gmail.com', env.ADMIN_EMAIL].filter(Boolean);
+  for (const email of adminEmails) {
+    const existing = await runSqliteQuery('SELECT * FROM users WHERE email = ?', [email]);
+    if (existing.rows.length === 0) {
+      const defaultPassword = process.env.INITIAL_ADMIN_PASSWORD || 'Admin@12345';
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(defaultPassword, salt);
+      const username = email.split('@')[0];
+
+      await runSqliteQuery(
+        `INSERT INTO users (full_name, email, username, password_hash, role) VALUES (?, ?, ?, ?, 'admin')`,
+        ['System Admin', email, username, passwordHash]
+      );
+      console.log(`[SQLITE INIT] 👑 Admin Account created/seeded: ${email}`);
+    } else if (existing.rows[0].role !== 'admin') {
+      await runSqliteQuery(`UPDATE users SET role = 'admin' WHERE email = ?`, [email]);
+      console.log(`[SQLITE INIT] 👑 Admin role granted to: ${email}`);
+    }
+  }
+
+  // Seed default site settings
+  const defaults = {
+    'login_heading': 'Welcome Back',
+    'login_subheading': 'Enter your credentials to enter the quiz arena'
+  };
+  for (const [k, v] of Object.entries(defaults)) {
+    await runSqliteQuery(`INSERT OR IGNORE INTO site_settings (key, value) VALUES (?, ?)`, [k, v]);
+  }
+
+  console.log(`✅ [SQLITE INIT] Local database initialized successfully.`);
+};
+
 // 3. Database initialization helper
 const initialize = async () => {
   try {
     // A. Test connection to the target database pool first with a retry mechanism
     let connectedDirectly = false;
-    const maxRetries = 5;
-    const retryIntervalMs = 5000;
+    const maxRetries = 2;
+    const retryIntervalMs = 1000;
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`Connecting to database (attempt ${attempt}/${maxRetries})...`);
 
         await new Promise((resolve, reject) => {
+          const timeout = setTimeout(() => reject(new Error('PostgreSQL connection timeout')), 2000);
           pool.connect((err, client, release) => {
+            clearTimeout(timeout);
             if (err) {
               reject(err);
             } else {
@@ -416,9 +587,6 @@ const initialize = async () => {
       } catch (err) {
         console.warn(`Connection attempt ${attempt} failed: ${err.message}`);
 
-        // If it is the first attempt and the error indicates the database does not exist,
-        // and we have local environment configuration (no DATABASE_URL or localhost),
-        // try to create the database automatically using standard credentials on the default postgres db.
         const isDbDoesNotExist = err.code === '3D000' || (err.message && err.message.includes('does not exist'));
         const isLocal = !env.DATABASE_URL || env.DB_HOST === 'localhost' || env.DB_HOST === '127.0.0.1';
 
@@ -436,7 +604,9 @@ const initialize = async () => {
           console.log(`Waiting ${retryIntervalMs / 1000} seconds before next attempt...`);
           await new Promise(resolve => setTimeout(resolve, retryIntervalMs));
         } else {
-          throw err; // Re-throw if all attempts failed
+          console.warn(`⚠️ PostgreSQL connection unavailable (${err.message}). Activating Local SQLite Engine Fallback...`);
+          await initializeSqliteFallback();
+          return;
         }
       }
     }
@@ -628,8 +798,8 @@ const initialize = async () => {
       console.log('Database seeded with default categories successfully.');
     }
   } catch (err) {
-    console.error('Database initialization failed:', err);
-    process.exit(1);
+    console.warn(`⚠️ PostgreSQL initialization failed (${err.message}). Activating Local SQLite Engine Fallback...`);
+    await initializeSqliteFallback();
   }
 };
 
@@ -637,7 +807,7 @@ const initialize = async () => {
 const dbInitPromise = initialize();
 
 module.exports = {
-  query: (text, params) => pool.query(text, params),
+  query: executeQuery,
   pool,
   dbInitPromise
 };
