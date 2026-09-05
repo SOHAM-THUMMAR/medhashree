@@ -12,7 +12,9 @@ def setup_nginx(root_dir: Path, env_vars: dict, domain: str = None):
     log_header("5/5 Configuring Nginx & UFW Firewall")
 
     if not is_ubuntu():
-        log_info("Skipping Nginx system configuration on non-Ubuntu system.")
+        log_info("Skipping Ubuntu Nginx/UFW system configuration on non-Ubuntu system.")
+        log_info(f"Frontend production bundle available at: {(root_dir / 'frontend' / 'dist').as_posix()}")
+        log_info(f"Backend API running/configured on port {env_vars.get('PORT', '5000')}")
         return
 
     frontend_dist = (root_dir / 'frontend' / 'dist').as_posix()

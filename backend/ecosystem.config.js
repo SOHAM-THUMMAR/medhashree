@@ -3,17 +3,28 @@ module.exports = {
     {
       name: 'medhashree-backend',
       script: 'server.js',
-      instances: 1,             // 1 instance is optimal for a 1 GB RAM server to preserve memory
-      exec_mode: 'fork',        // Fork mode has less RAM overhead than cluster mode
-      watch: false,             // Do not watch files in production to save CPU cycles
-      max_memory_restart: '400M', // Auto-restart if process RAM usage exceeds 400MB (prevents OOM crashes)
+      cwd: 'D:/work 4 life/medhashree/backend',
+      instances: 2,
+      exec_mode: 'cluster',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '300M',
+      node_args: '--max-old-space-size=256',
       env: {
-        NODE_ENV: 'development',
-        PORT: 5000
-      },
-      env_production: {
         NODE_ENV: 'production',
         PORT: 5000
+      }
+    },
+    {
+      name: 'medhashree-monitor',
+      script: 'D:/work 4 life/medhashree/monitor.py',
+      interpreter: 'python',
+      cwd: 'D:/work 4 life/medhashree',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '80M',
+      env: {
+        MONITOR_PORT: 5001
       }
     }
   ]

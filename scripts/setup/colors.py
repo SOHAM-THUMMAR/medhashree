@@ -1,6 +1,8 @@
-"""
-Terminal color formatting utilities for Medhashree deployment scripts
-"""
+import os
+import sys
+
+if sys.platform == 'win32':
+    os.system('')  # Enable ANSI escape sequences on Windows Console
 
 class Colors:
     HEADER = '\033[95m'

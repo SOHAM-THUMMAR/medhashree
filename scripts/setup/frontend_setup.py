@@ -16,11 +16,18 @@ def build_frontend(root_dir: Path):
         log_error(f"Frontend directory not found at {frontend_dir}")
         sys.exit(1)
 
-    log_info("Installing frontend NPM dependencies...")
-    subprocess.run("npm install", shell=True, cwd=frontend_dir, check=True)
+    import shutil
+    pkg_cmd = 'pnpm' if (not shutil.which('npm') and shutil.which('pnpm')) else 'npm'
+
+    log_info(f"Installing frontend dependencies using {pkg_cmd}...")
+    if pkg_cmd == 'pnpm':
+        subprocess.run("pnpm install --no-frozen-lockfile", shell=True, cwd=frontend_dir, check=False)
+        subprocess.run("pnpm approve-builds --all", shell=True, cwd=frontend_dir, check=False)
+    else:
+        subprocess.run("npm install", shell=True, cwd=frontend_dir, check=True)
 
     log_info("Compiling production React bundle with Vite...")
-    subprocess.run("npm run build", shell=True, cwd=frontend_dir, check=True)
+    subprocess.run(f"{pkg_cmd} run build", shell=True, cwd=frontend_dir, check=True)
 
     dist_dir = frontend_dir / 'dist'
     if dist_dir.exists():

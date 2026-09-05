@@ -175,14 +175,20 @@ app.set('io', io);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Serve React client static files
-app.use(express.static(path.join(__dirname, '../client/dist')));
+const frontendDistPath = path.join(__dirname, '../frontend/dist');
+app.use(express.static(frontendDistPath));
 
 // SPA router fallback (directs non-API traffic to React)
 app.get('*all', (req, res) => {
   if (req.originalUrl.startsWith('/api')) {
     return res.status(404).json({ success: false, error: 'API endpoint not found' });
   }
-  res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+  const indexHtmlPath = path.join(frontendDistPath, 'index.html');
+  if (require('fs').existsSync(indexHtmlPath)) {
+    res.sendFile(indexHtmlPath);
+  } else {
+    res.json({ success: true, message: 'Medhashree API is running. Build frontend with "python start.py" or "cd frontend && pnpm run build" to view UI.' });
+  }
 });
 
 // ──────────────────────────────────────────

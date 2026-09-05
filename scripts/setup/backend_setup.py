@@ -17,8 +17,9 @@ def build_backend_and_start_pm2(root_dir: Path, env_vars: dict):
         log_error(f"Backend directory not found at {backend_dir}")
         sys.exit(1)
 
-    log_info("Installing backend NPM dependencies...")
-    subprocess.run("npm install", shell=True, cwd=backend_dir, check=True)
+    pkg_cmd = 'pnpm' if (not shutil.which('npm') and shutil.which('pnpm')) else 'npm'
+    log_info(f"Installing backend dependencies using {pkg_cmd}...")
+    subprocess.run(f"{pkg_cmd} install", shell=True, cwd=backend_dir, check=True)
 
     log_info("Running database migrations & schema initialization...")
     subprocess.run("node -e \"require('./config/db.js')\"", shell=True, cwd=backend_dir, check=False)
@@ -27,6 +28,8 @@ def build_backend_and_start_pm2(root_dir: Path, env_vars: dict):
     port = env_vars.get('PORT', '5000')
     monitor_port = env_vars.get('MONITOR_PORT', '5001')
     monitor_path = (root_dir / 'monitor.py').as_posix()
+
+    py_interpreter = 'python' if sys.platform == 'win32' else 'python3'
 
     ecosystem_content = f"""module.exports = {{
   apps: [
@@ -38,8 +41,8 @@ def build_backend_and_start_pm2(root_dir: Path, env_vars: dict):
       exec_mode: 'cluster',
       autorestart: true,
       watch: false,
-      max_memory_restart: '900M',
-      node_args: '--max-old-space-size=768',
+      max_memory_restart: '300M',
+      node_args: '--max-old-space-size=256',
       env: {{
         NODE_ENV: 'production',
         PORT: {port}
@@ -48,11 +51,11 @@ def build_backend_and_start_pm2(root_dir: Path, env_vars: dict):
     {{
       name: 'medhashree-monitor',
       script: '{monitor_path}',
-      interpreter: 'python3',
+      interpreter: '{py_interpreter}',
       cwd: '{root_dir.as_posix()}',
       autorestart: true,
       watch: false,
-      max_memory_restart: '100M',
+      max_memory_restart: '80M',
       env: {{
         MONITOR_PORT: {monitor_port}
       }}

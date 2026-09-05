@@ -16,19 +16,46 @@
 ─────────────────────────────────────────────────────────────────────────────
 """
 
+import os
 import sys
 import shutil
 import argparse
 import subprocess
 from pathlib import Path
 
+if sys.platform == 'win32':
+    if hasattr(sys.stdout, 'reconfigure'):
+        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+    if hasattr(sys.stderr, 'reconfigure'):
+        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+
 # Add project root to python path for imports
 ROOT_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, ROOT_DIR.as_posix())
 
+def ensure_node_in_path():
+    """Ensure Node.js and npm/pnpm runtime executables are in PATH on Windows and Linux"""
+    user_home = os.path.expanduser("~")
+    extra_paths = [
+        os.path.join(user_home, ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "node", "bin"),
+        os.path.join(user_home, ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "bin"),
+        r"C:\Program Files\nodejs",
+        os.path.join(user_home, "AppData", "Roaming", "npm"),
+        os.path.join(user_home, "AppData", "Local", "Programs", "Node"),
+        "/usr/local/bin",
+        "/usr/bin"
+    ]
+    path_entries = os.environ.get("PATH", "").split(os.path.pathsep)
+    for p in extra_paths:
+        if os.path.exists(p) and p not in path_entries:
+            path_entries.insert(0, p)
+    os.environ["PATH"] = os.path.pathsep.join(path_entries)
+
+ensure_node_in_path()
+
 from scripts.setup.colors import Colors, log_info, log_success, log_warn, log_error, log_header
 from scripts.setup.env_manager import setup_centralized_env
-from scripts.setup.system_deps import install_system_dependencies, is_ubuntu
+from scripts.setup.system_deps import install_system_dependencies, is_ubuntu, is_windows
 from scripts.setup.database_setup import setup_postgresql
 from scripts.setup.backend_setup import build_backend_and_start_pm2
 from scripts.setup.frontend_setup import build_frontend
@@ -55,23 +82,28 @@ def verify_and_start_all(root_dir: Path, env_vars: dict):
         if 'medhashree-backend' in pm2_status.stdout and 'medhashree-monitor' in pm2_status.stdout:
             log_success("Backend Node.js & Python Monitor services are RUNNING under PM2.")
         else:
-            log_warn("PM2 services inactive. Restarting...")
+            log_warn("PM2 services inactive. Starting/Restarting...")
             backend_dir = root_dir / 'backend'
             subprocess.run("pm2 startOrRestart ecosystem.config.js --env production", shell=True, cwd=backend_dir, check=False)
+    else:
+        log_info("Standard non-PM2 / Development setup detected.")
+        log_info(f"To start backend: node backend/server.js (Port {env_vars.get('PORT', 5000)})")
+        log_info(f"To start monitor: python monitor.py (Port {env_vars.get('MONITOR_PORT', 5001)})")
+        log_info(f"Frontend bundle compiled at: frontend/dist")
 
-    log_success("All website services verified & running! Your website is live! 🚀")
+    log_success("All website services verified & setup completed successfully!")
 
 def main():
-    parser = argparse.ArgumentParser(description="Medhashree Ubuntu Automated Setup & Hosting Script")
+    parser = argparse.ArgumentParser(description="Medhashree Cross-Platform Automated Setup & Hosting Script")
     parser.add_argument("--domain", help="Optional domain name for Nginx & SSL (e.g. medhashree.com)", default=None)
     parser.add_argument("--skip-deps", help="Skip system package installation", action="store_true")
+    parser.add_argument("--run", help="Auto-start backend server immediately after setup completes", action="store_true")
     args = parser.parse_args()
 
-    import os
     print(f"{Colors.BOLD}{Colors.OKGREEN}")
     print(r"""
   __  __ edhashree - Quiz & Learning Platform
- |  \/  |  Automated Ubuntu Setup & Nginx Hosting Script
+ |  \/  |  Automated Setup & Hosting Script
  |_|\/|_|  Owner & Security Control Framework 2026
     """)
     print(f"{Colors.ENDC}")
@@ -101,6 +133,13 @@ def main():
 
     # 7. Verification check
     verify_and_start_all(ROOT_DIR, env_vars)
+
+    # 8. Auto-start server if --run flag provided
+    if args.run:
+        log_header("Launching Medhashree Website Server")
+        server_script = (ROOT_DIR / 'backend' / 'server.js').as_posix()
+        log_info(f"Starting Node.js server: node {server_script}")
+        subprocess.run(f"node {server_script}", shell=True)
 
 if __name__ == '__main__':
     main()
