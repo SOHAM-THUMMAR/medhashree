@@ -14,8 +14,10 @@ function ActivityLogs() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
   const [severityFilter, setSeverityFilter] = useState('all');
-  const [actionFilter] = useState('');
+  const [actionFilter, setActionFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   // Stats state
   const [stats, setStats] = useState({
@@ -97,6 +99,8 @@ function ActivityLogs() {
         search: searchQuery
       });
       if (actionFilter) params.append('action', actionFilter);
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
 
       const res = await authFetch(`/admin/activity-logs?${params.toString()}`);
       const data = await res.json();
@@ -113,7 +117,7 @@ function ActivityLogs() {
     } finally {
       setLoading(false);
     }
-  }, [page, severityFilter, actionFilter, searchQuery]);
+  }, [page, severityFilter, actionFilter, searchQuery, startDate, endDate]);
 
   useEffect(() => {
     fetchLogs();
@@ -299,31 +303,91 @@ function ActivityLogs() {
       />
 
       {/* Logs Filters Toolbar */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-          <select
-            value={severityFilter}
-            onChange={(e) => { setSeverityFilter(e.target.value); setPage(1); }}
-            className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500"
-          >
-            <option value="all">All Severities</option>
-            <option value="info">Info</option>
-            <option value="warning">Warning</option>
-            <option value="error">Error</option>
-            <option value="security">Security</option>
-          </select>
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {/* Search Box */}
+            <div className="relative w-full sm:w-72">
+              <input
+                type="text"
+                placeholder="Search email, user, IP, action, details..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-indigo-500 placeholder-slate-500"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-xs">🔍</span>
+            </div>
 
-          <input
-            type="text"
-            placeholder="Search action, user, IP, or path..."
-            value={searchQuery}
-            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-            className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs w-full sm:w-64 focus:outline-none focus:border-indigo-500"
-          />
+            {/* Severity Filter */}
+            <select
+              value={severityFilter}
+              onChange={(e) => { setSeverityFilter(e.target.value); setPage(1); }}
+              className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+            >
+              <option value="all">All Severities</option>
+              <option value="info">Info</option>
+              <option value="warning">Warning</option>
+              <option value="error">Error</option>
+              <option value="security">Security</option>
+            </select>
+
+            {/* Action Type Filter */}
+            <select
+              value={actionFilter}
+              onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
+              className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+            >
+              <option value="">All Action Types</option>
+              <option value="SYSTEM_RESOURCE_METRICS">🖥️ System Resource Metrics</option>
+              <option value="USER_LOGIN">🔑 User Logins & OTP</option>
+              <option value="USER_REGISTER">📝 User Registrations</option>
+              <option value="SECURITY">🛡️ Security Triggers</option>
+              <option value="ADMIN">👑 Admin Panel Actions</option>
+            </select>
+          </div>
+
+          {/* Date Wise Filters */}
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+            <div className="flex items-center gap-1 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1.5 rounded-xl">
+              <span className="text-[11px] text-slate-400 font-semibold uppercase">From:</span>
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
+                className="bg-transparent text-slate-200 text-xs focus:outline-none"
+              />
+            </div>
+
+            <div className="flex items-center gap-1 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1.5 rounded-xl">
+              <span className="text-[11px] text-slate-400 font-semibold uppercase">To:</span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
+                className="bg-transparent text-slate-200 text-xs focus:outline-none"
+              />
+            </div>
+
+            {(searchQuery || severityFilter !== 'all' || actionFilter || startDate || endDate) && (
+              <button
+                onClick={() => {
+                  setSearchQuery('');
+                  setSeverityFilter('all');
+                  setActionFilter('');
+                  setStartDate('');
+                  setEndDate('');
+                  setPage(1);
+                }}
+                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+              >
+                Clear Filters ✕
+              </button>
+            )}
+          </div>
         </div>
 
-        <div className="text-xs text-slate-400 w-full md:w-auto text-right">
-          Showing {logs.length} of {totalLogs} logs
+        <div className="text-xs text-slate-400 text-right border-t border-slate-800/60 pt-2">
+          Showing <span className="font-bold text-indigo-400">{logs.length}</span> of <span className="font-bold text-white">{totalLogs}</span> activity log records
         </div>
       </div>
 

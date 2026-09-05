@@ -112,7 +112,74 @@ class MetricsHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+def append_system_metric_log(metrics):
+    try:
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        logs_dir = os.path.join(base_dir, "backend", "logs")
+        os.makedirs(logs_dir, exist_ok=True)
+        logs_file = os.path.join(logs_dir, "activity.json")
+
+        logs = []
+        if os.path.exists(logs_file):
+            try:
+                with open(logs_file, "r", encoding="utf-8") as f:
+                    raw = f.read().strip()
+                    if raw:
+                        logs = json.loads(raw)
+            except Exception:
+                logs = []
+
+        max_id = max([item.get("log_id", 0) for item in logs], default=0)
+
+        entry = {
+            "log_id": max_id + 1,
+            "user_id": None,
+            "username": "python_monitor_service",
+            "role": "system",
+            "action": "SYSTEM_RESOURCE_METRICS",
+            "method": "MONITOR",
+            "endpoint": "/metrics",
+            "ip_address": "127.0.0.1",
+            "user_agent": f"Python/{sys.version.split()[0]} (psutil)",
+            "status_code": 200,
+            "severity": "info",
+            "details": {
+                "cpuUsagePercent": metrics["cpu"]["usagePercent"],
+                "cpuCores": metrics["cpu"]["cores"],
+                "memUsedMB": metrics["memory"]["usedMemMB"],
+                "memTotalMB": metrics["memory"]["totalMemMB"],
+                "memUsedPercent": metrics["memory"]["usedPercent"],
+                "diskUsedGB": metrics["disk"]["usedGB"],
+                "diskTotalGB": metrics["disk"]["totalGB"],
+                "diskUsedPercent": metrics["disk"]["usedPercent"],
+                "uptimeSec": metrics["system"]["uptimeSec"]
+            },
+            "created_at": time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+        }
+
+        logs.insert(0, entry)
+        if len(logs) > 10000:
+            logs = logs[:10000]
+
+        with open(logs_file, "w", encoding="utf-8") as f:
+            json.dump(logs, f, indent=2)
+    except Exception as e:
+        print(f"[Python Monitor Log Error] {e}")
+
+def background_logger_loop():
+    while True:
+        try:
+            metrics = collector.get_metrics()
+            append_system_metric_log(metrics)
+        except Exception as e:
+            print(f"[Python Monitor Loop Warning] {e}")
+        time.sleep(60)
+
 def run_server():
+    # Start background logging thread
+    log_thread = Thread(target=background_logger_loop, daemon=True)
+    log_thread.start()
+
     server_address = ('127.0.0.1', PORT)
     httpd = HTTPServer(server_address, MetricsHTTPRequestHandler)
     print(f"[Python Monitor] Service running on http://127.0.0.1:{PORT}/metrics")
