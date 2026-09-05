@@ -36,9 +36,14 @@ sys.path.insert(0, ROOT_DIR.as_posix())
 def ensure_node_in_path():
     """Ensure Node.js and npm/pnpm runtime executables are in PATH on Windows and Linux"""
     user_home = os.path.expanduser("~")
+    pnpm_bin = os.path.join(user_home, "AppData", "Local", "pnpm", "bin")
+    if sys.platform == 'win32':
+        os.makedirs(pnpm_bin, exist_ok=True)
+
     extra_paths = [
         os.path.join(user_home, ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "node", "bin"),
         os.path.join(user_home, ".cache", "codex-runtimes", "codex-primary-runtime", "dependencies", "bin"),
+        pnpm_bin,
         r"C:\Program Files\nodejs",
         os.path.join(user_home, "AppData", "Roaming", "npm"),
         os.path.join(user_home, "AppData", "Local", "Programs", "Node"),
