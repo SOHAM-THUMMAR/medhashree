@@ -1,48 +1,55 @@
-# Medhashree — Engineering & Contributor Guide
+# 🚀 Medhashree — Competitive Quiz & Learning Platform
 
-Welcome to **Medhashree**! Medhashree is a high-performance, full-stack competitive quiz and learning battleground platform built with React 19, Node.js, Express, Socket.IO, PostgreSQL, and Python sidecar resource monitoring.
+Welcome to **Medhashree**! Medhashree is a high-performance, full-stack competitive quiz battleground and learning platform built with React 19, Node.js, Express, Socket.IO, PostgreSQL (with SQLite engine fallback), and a Python system resource monitoring service.
 
-This guide provides everything you need as a contributor or developer to set up, build, test, and contribute to the project on **Windows** and **Ubuntu/Linux**.
+---
+
+## 🌟 Key Platform Features
+
+- **👑 High-End Dark UI Workspace**: Unified design system (`AdminNavBanner`) across Admin Dashboard, User Management, Activity Logs, Content Editor, Tournaments, Bug Reports, and Site Settings.
+- **👥 Manage Users Workspace (`/admin/users`)**: 4 real-time stat cards, role filtering (Student, Instructor, Admin), instant search, role dropdown badges, and modal password modification.
+- **📋 Zero-Overhead Activity Logging (`/admin/activity-logs`)**: Stored in a JSON file database (`backend/logs/activity.json`) to eliminate database write overhead. Features email search, date filters, severity badges, and `LogInspectorModal`.
+- **📧 Multi-Admin Email Alerts**: High-traffic milestones, security triggers, and test emails deliver simultaneously to **all active admin accounts** in the database.
+- **🌐 Clean IP & URL Normalization**: Automatically normalizes IPv6 loopbacks (`::1` / `::ffff:`) into clean IPv4 format (`127.0.0.1`) and sanitizes endpoint URLs.
+- **🖥️ Python System Resource Monitor**: Real-time sidecar service (`monitor.py` on port 5001) logging CPU, RAM, Disk, and system uptime.
+- **📱 Fully Mobile Responsive**: Engineered with fluid viewports (375px+) across mobile devices, tablets, and desktops.
 
 ---
 
 ## ⚡ Quickstart: Automated Setup with `start.py`
 
-Medhashree includes an automated cross-platform setup script ([`start.py`](file:///d:/work%204%20life/medhashree/start.py)) that works out of the box on both **Windows** and **Ubuntu/Linux**.
+Medhashree includes an automated cross-platform setup script (`start.py`) that works out of the box on **Windows** and **Ubuntu Linux**.
 
 ### Prerequisites
 - **Python 3.10+**
-- **Node.js 18+** (with `npm` or `pnpm`)
-- **PostgreSQL 14+** (running locally on port `5432` or via cloud connection string)
+- **Node.js 18+** (with `pnpm` or `npm`)
+- **PostgreSQL 14+** (running locally on port `5432` or via fallback SQLite engine)
 
 ### One-Command Setup
 Clone the repository and run:
 
 ```bash
-# Clone the repository
 git clone https://github.com/SOHAM-THUMMAR/medhashree.git
 cd medhashree
 
-# Run the cross-platform setup script
+# Run automated setup script
 python start.py
 ```
 
-#### What `start.py` Automates:
-1. **Centralized `.env`**: Auto-generates a unified `.env` file with secure default secrets if missing.
-2. **Environment & Dependency Checks**: Verifies Node.js/Python executables and packages (`psutil`). On Ubuntu, installs missing system packages (`nginx`, `postgresql`, `pm2`, `certbot`, `ufw`).
-3. **Database Configuration**: Verifies PostgreSQL connection parameters and service status.
-4. **Backend Setup**: Installs backend dependencies (`pnpm`/`npm`), runs database schema migrations ([`backend/config/db.js`](file:///d:/work%204%20life/medhashree/backend/config/db.js)), and creates PM2 ecosystem configurations.
-5. **Frontend Compilation**: Installs React dependencies and compiles production Vite assets into [`frontend/dist`](file:///d:/work%204%20life/medhashree/frontend/dist).
-6. **Reverse Proxy & Firewall**: Configures Nginx site definitions and UFW firewall rules on Ubuntu servers.
+#### Ubuntu VPS Production Deployment (One Command):
+```bash
+sudo python3 start.py --domain yourdomain.com --run
+```
+*(For complete deployment commands and server instructions, check [DEPLOYMENT.md](DEPLOYMENT.md))*
 
 ---
 
-## 🛠️ Local Development Guide
+## 🛠️ Contributor & Developer Local Guide
 
-If you are developing features or bug fixes locally, follow these steps to run each component in development mode:
+If you are developing features or bug fixes locally, follow these steps:
 
 ### 1. Centralized Environment (`.env`)
-The project uses a unified `.env` file in the root directory. Ensure your `.env` contains:
+The project uses a unified `.env` file in the root directory:
 
 ```env
 NODE_ENV=development
@@ -53,9 +60,9 @@ DB_PORT=5432
 DB_USER=postgres
 DB_PASSWORD=postgres
 DB_NAME=medhashree
-DB_SSL=false
 
-JWT_SECRET=your_super_secret_jwt_key
+JWT_SECRET=super_secret_medhashree_jwt_key_2026
+ADMIN_EMAIL=sohamthummar04@gmail.com
 
 ENABLE_RESOURCE_MONITORING=true
 MONITOR_PORT=5001
@@ -68,23 +75,23 @@ VITE_SOCKET_URL=http://localhost:5000
 ### 2. Running the Backend Server
 ```bash
 cd backend
-pnpm install   # or npm install
-pnpm dev       # or npm run dev
+pnpm install
+pnpm dev
 ```
-- **Backend REST API**: `http://localhost:5000/api`
+- **Backend API**: `http://localhost:5000/api`
 - **WebSockets Engine**: `http://localhost:5000/socket.io`
 
 ### 3. Running the Python Resource Monitor
 ```bash
 python monitor.py
 ```
-- **Sidecar Metrics Endpoint**: `http://127.0.0.1:5001/metrics`
+- **Metrics Endpoint**: `http://127.0.0.1:5001/metrics`
 
 ### 4. Running the Frontend App
 ```bash
 cd frontend
-pnpm install   # or npm install
-pnpm dev       # or npm run dev
+pnpm install
+pnpm dev
 ```
 - **Frontend App**: `http://localhost:5173`
 
@@ -95,41 +102,32 @@ pnpm dev       # or npm run dev
 ```
 medhashree/
 ├── backend/                  # Node.js Express REST API & Socket.IO WebSockets
-│   ├── config/               # Database pool & environment variables setup
-│   ├── controllers/          # Request handlers (auth, quizzes, tournaments, users)
-│   ├── handlers/             # Socket event handlers (battles, matchmaking)
-│   ├── middleware/           # Auth JWT verification, rate limiting, error handlers
-│   ├── models/               # Data access queries
+│   ├── config/               # Database pool & environment setup (db.js, env.js)
+│   ├── controllers/          # Request handlers (auth, admin, quizzes, tournaments)
+│   ├── logs/                 # JSON activity log store (activity.json)
+│   ├── middleware/           # Auth JWT verification, rate limiting, logger middleware
 │   ├── routes/               # Express routing endpoints
-│   ├── services/             # Business logic & resource monitoring services
-│   └── server.js             # HTTP server entry point
+│   ├── services/             # Business logic, loggerService, alertEmailService
+│   └── server.js             # Express HTTP & Socket.IO server entry point
 ├── frontend/                 # React 19 + Vite Single Page Application
-│   ├── public/               # Static assets & icons
 │   ├── src/
-│   │   ├── components/       # Modular UI components (Navbar, Modals, Battle cards)
-│   │   ├── context/          # React Contexts (AuthContext, SocketContext)
-│   │   ├── pages/            # Page views (Home, Dashboard, QuizPlayView, Tournaments)
-│   │   └── services/         # API client & axios instances
-│   ├── package.json          # Dependencies & npm scripts
+│   │   ├── components/       # Modular UI components (AdminNavBanner, Modals, Topbar)
+│   │   ├── pages/            # Page views (AdminDashboard, ActivityLogs, ManageUsers)
+│   │   └── config/           # API fetch helpers & routing config
 │   └── vite.config.js        # Vite bundler configuration
-├── scripts/                  # Cross-platform automated setup scripts
-│   └── setup/
-│       ├── backend_setup.py  # Backend NPM setup & PM2 manager
-│       ├── database_setup.py # PostgreSQL configuration & service checks
-│       ├── env_manager.py    # Centralized .env generator & loader
-│       ├── frontend_setup.py # React Vite production asset builder
-│       ├── nginx_setup.py    # Nginx reverse proxy & firewall setup
-│       └── system_deps.py   # OS package & environment verifier
+├── scripts/                  # Automated setup scripts
+│   └── setup/                # System deps, database setup, PM2 & Nginx setup modules
 ├── monitor.py                # Python system resource monitor sidecar service (port 5001)
-├── start.py                  # Automated setup entry point (cross-platform)
-└── docker-compose.yml        # Docker deployment configuration
+├── start.py                  # Automated cross-platform setup entry point
+├── DEPLOYMENT.md             # Complete Ubuntu VPS deployment guide & commands
+└── README.md                 # Developer & Contributor Guide
 ```
 
 ---
 
 ## 🤝 Contribution Guidelines
 
-We welcome contributions from developers! Follow these guidelines to get started:
+We welcome contributions from open-source developers! Follow these steps to contribute:
 
 ### Step 1: Fork & Branch
 1. Fork the repository on GitHub.
@@ -138,38 +136,34 @@ We welcome contributions from developers! Follow these guidelines to get started
    git clone https://github.com/<your-username>/medhashree.git
    cd medhashree
    ```
-3. Create a feature branch:
+3. Create a feature or bugfix branch:
    ```bash
    git checkout -b feature/awesome-new-quiz-mode
-   # or for bug fixes:
-   git checkout -b fix/auth-token-refresh
    ```
 
-### Step 2: Code & Test
-- Follow modular JavaScript / Python coding standards.
-- Ensure cross-platform compatibility (test code on Windows or Linux).
-- When modifying database tables, append safe migrations in [`backend/config/db.js`](file:///d:/work%204%20life/medhashree/backend/config/db.js) using `IF NOT EXISTS` guards.
+### Step 2: Code & Verification
+- Ensure code adheres to clean modular JavaScript (ESNext) and Python standards.
+- Test responsive mobile viewports (375px+).
+- When modifying database tables, use `IF NOT EXISTS` migration guards in `backend/config/db.js`.
+- Verify production build compiles cleanly:
+  ```bash
+  cd frontend && pnpm build
+  ```
 
 ### Step 3: Commit & Push
-Use clear commit messages:
+Use descriptive commit messages:
 ```bash
 git add .
-git commit -m "feat: add real-time tournament leaderboard updates via Socket.IO"
+git commit -m "feat(quizzes): add real-time tournament leaderboard updates"
 git push origin feature/awesome-new-quiz-mode
 ```
 
 ### Step 4: Create a Pull Request
-1. Open a Pull Request against the `main` branch.
-2. Describe your changes clearly and link any associated issues.
+Open a Pull Request against the `main` branch of [`SOHAM-THUMMAR/medhashree`](https://github.com/SOHAM-THUMMAR/medhashree). Describe your changes and reference any related issue tickets.
 
 ---
 
-## 🚀 Production Hosting (Ubuntu VPS)
+## 📜 License & Author
 
-For production deployment on an Ubuntu VPS with automated Nginx reverse proxy, SSL certificates, and PM2 process daemons:
-
-```bash
-sudo python3 start.py --domain medhashree.com
-```
-
-Refer to [SEO_SERVER_GUIDE.md](file:///d:/work%204%20life/medhashree/SEO_SERVER_GUIDE.md) for detailed search engine optimization and production server tuning.
+- **Project Lead & Owner**: [SOHAM THUMMAR](https://github.com/SOHAM-THUMMAR)
+- **Repository**: [https://github.com/SOHAM-THUMMAR/medhashree](https://github.com/SOHAM-THUMMAR/medhashree)
