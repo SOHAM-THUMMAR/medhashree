@@ -53,17 +53,14 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: 'pnpm'
-          cache-dependency-path: '**/pnpm-lock.yaml'
+          cache: 'npm'
+          cache-dependency-path: |
+            frontend/package-lock.json
+            backend/package-lock.json
 
       # Verify Root Centralized .env Template
       - name: Verify Centralized Environment Template
@@ -73,11 +70,11 @@ jobs:
       # Install & Lint Backend
       - name: Install Backend Dependencies
         working-directory: ./backend
-        run: pnpm install
+        run: npm ci
 
       - name: Lint Backend
         working-directory: ./backend
-        run: pnpm run lint
+        run: npm run lint
 
       - name: Verify Backend Code Syntax
         working-directory: ./backend
@@ -86,15 +83,15 @@ jobs:
       # Install & Lint & Build Frontend
       - name: Install Frontend Dependencies
         working-directory: ./frontend
-        run: pnpm install
+        run: npm ci
 
       - name: Lint Frontend
         working-directory: ./frontend
-        run: pnpm run lint
+        run: npm run lint
 
       - name: Build Frontend (React + Vite)
         working-directory: ./frontend
-        run: pnpm run build
+        run: npm run build
 
   # -------------------------------------------------------------
   # Job 3: Code Quality, Duplication & Dependency Check
