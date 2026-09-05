@@ -450,78 +450,13 @@ const initializeSqliteFallback = async () => {
   await runSqliteQuery('PRAGMA journal_mode = WAL;');
   await runSqliteQuery('PRAGMA foreign_keys = ON;');
 
-  // Create tables in SQLite
-  const sqliteTables = [
-    `CREATE TABLE IF NOT EXISTS site_settings (
-      key TEXT PRIMARY KEY,
-      value TEXT NOT NULL
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS users (
-      user_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      full_name TEXT NOT NULL,
-      email TEXT UNIQUE NOT NULL,
-      username TEXT UNIQUE NOT NULL,
-      password_hash TEXT NOT NULL,
-      role TEXT NOT NULL DEFAULT 'student',
-      profile_picture TEXT,
-      country TEXT DEFAULT 'INDIA',
-      total_points INTEGER DEFAULT 0,
-      total_quizzes INTEGER DEFAULT 0,
-      global_rank INTEGER,
-      current_streak INTEGER DEFAULT 0,
-      highest_streak INTEGER DEFAULT 0,
-      average_score REAL DEFAULT 0.00,
-      win_rate REAL DEFAULT 0.00,
-      time_played_min INTEGER DEFAULT 0,
-      completion_rate REAL DEFAULT 0.00,
-      best_category TEXT,
-      fav_category TEXT,
-      weakest_category TEXT,
-      is_active INTEGER DEFAULT 1,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS categories (
-      category_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT UNIQUE NOT NULL,
-      description TEXT,
-      gradient_from TEXT,
-      gradient_to TEXT,
-      border_color TEXT,
-      is_active INTEGER DEFAULT 1,
-      sort_order INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS password_resets (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-      otp TEXT NOT NULL,
-      expires_at DATETIME NOT NULL,
-      is_used INTEGER DEFAULT 0
-    )`,
-
-    `CREATE TABLE IF NOT EXISTS activity_logs (
-      log_id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
-      username TEXT,
-      role TEXT,
-      action TEXT NOT NULL,
-      method TEXT,
-      endpoint TEXT,
-      ip_address TEXT,
-      user_agent TEXT,
-      status_code INTEGER,
-      severity TEXT DEFAULT 'info',
-      details TEXT,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    )`
-  ];
-
-  for (const q of sqliteTables) {
-    await runSqliteQuery(q);
+  // Create all tables in SQLite using schemaQueries
+  for (const q of schemaQueries) {
+    try {
+      await runSqliteQuery(q);
+    } catch (e) {
+      console.warn('SQLite Table Initialization Notice:', e.message);
+    }
   }
 
   // Seed default admin users

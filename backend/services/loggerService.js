@@ -40,7 +40,7 @@ class LoggerService {
       await db.query(
         `INSERT INTO activity_logs 
          (user_id, username, role, action, method, endpoint, ip_address, user_agent, status_code, severity, details)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
         [
           userId,
           username,

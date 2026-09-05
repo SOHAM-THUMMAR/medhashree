@@ -66,6 +66,28 @@ const deleteUser = async (req, res) => {
   }
 };
 
+const changeUserPassword = async (req, res) => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const { newPassword } = req.body;
+    if (!newPassword || newPassword.length < 6) {
+      return error(res, 'Password must be at least 6 characters', 400);
+    }
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(newPassword, salt);
+
+    await db.query(
+      'UPDATE users SET password_hash = $1, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2',
+      [passwordHash, req.params.id]
+    );
+
+    return success(res, null, 'User password updated successfully');
+  } catch (err) {
+    console.error('Admin Change Password Error:', err);
+    return error(res, 'Failed to update user password', 500);
+  }
+};
+
 // Content Management Controller Methods
 const getAllContent = async (req, res) => {
   try {
@@ -186,6 +208,7 @@ module.exports = {
   updateUserRole,
   toggleUserActive,
   deleteUser,
+  changeUserPassword,
 
   // Content
   getAllContent,

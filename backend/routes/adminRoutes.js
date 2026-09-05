@@ -13,6 +13,7 @@ router.get('/dashboard', adminController.getDashboardStats);
 router.get('/users', adminController.getAllUsers);
 router.put('/users/:id/role', adminController.updateUserRole);
 router.put('/users/:id/active', adminController.toggleUserActive);
+router.put('/users/:id/password', adminController.changeUserPassword);
 router.delete('/users/:id', adminController.deleteUser);
 
 // Content management
