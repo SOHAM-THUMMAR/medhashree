@@ -65,10 +65,13 @@ def is_root() -> bool:
     """Check root / superuser privileges"""
     return hasattr(os, 'geteuid') and os.geteuid() == 0
 
-def verify_and_start_all(root_dir: Path, env_vars: dict):
-    """Verify system status and restart services if stopped"""
-    log_header("Verifying System Status & Services")
+def verify_and_start_all(root_dir: Path, env_vars: dict, domain: str = None):
+    """Verify system status and print live website links"""
+    log_header("Verifying System Status & Live Services")
     
+    port = env_vars.get('PORT', '5000')
+    monitor_port = env_vars.get('MONITOR_PORT', '5001')
+
     if is_ubuntu():
         nginx_status = subprocess.run("systemctl is-active nginx", shell=True, capture_output=True, text=True)
         if 'active' not in nginx_status.stdout:
@@ -85,13 +88,30 @@ def verify_and_start_all(root_dir: Path, env_vars: dict):
             log_warn("PM2 services inactive. Starting/Restarting...")
             backend_dir = root_dir / 'backend'
             subprocess.run("pm2 startOrRestart ecosystem.config.js --env production", shell=True, cwd=backend_dir, check=False)
-    else:
-        log_info("Standard non-PM2 / Development setup detected.")
-        log_info(f"To start backend: node backend/server.js (Port {env_vars.get('PORT', 5000)})")
-        log_info(f"To start monitor: python monitor.py (Port {env_vars.get('MONITOR_PORT', 5001)})")
-        log_info(f"Frontend bundle compiled at: frontend/dist")
 
     log_success("All website services verified & setup completed successfully!")
+
+    print(f"\n{Colors.BOLD}{Colors.OKGREEN}─────────────────────────────────────────────────────────────────────────────{Colors.ENDC}")
+    print(f"{Colors.BOLD}{Colors.OKGREEN} 🎉 MEDHASHREE WEBSITE SETUP COMPLETED SUCCESSFULLY! {Colors.ENDC}")
+    print(f"{Colors.BOLD}{Colors.OKGREEN}─────────────────────────────────────────────────────────────────────────────{Colors.ENDC}")
+
+    if domain:
+        print(f" {Colors.BOLD}🌐 Main Website URL:{Colors.ENDC}       https://{domain}")
+        print(f" {Colors.BOLD}⚙️  Backend API Endpoint:{Colors.ENDC}   https://{domain}/api")
+        print(f" {Colors.BOLD}📊 Resource Monitor:{Colors.ENDC}       http://127.0.0.1:{monitor_port}/metrics")
+    elif is_ubuntu():
+        print(f" {Colors.BOLD}🌐 Main Website URL:{Colors.ENDC}       http://localhost (or server IP)")
+        print(f" {Colors.BOLD}⚙️  Backend API Endpoint:{Colors.ENDC}   http://localhost/api")
+        print(f" {Colors.BOLD}📊 Resource Monitor:{Colors.ENDC}       http://127.0.0.1:{monitor_port}/metrics")
+    else:
+        print(f" {Colors.BOLD}🌐 Localhost Website App:{Colors.ENDC}   http://localhost:{port}")
+        print(f" {Colors.BOLD}⚡ Vite Live Dev Server:{Colors.ENDC}    http://localhost:5173")
+        print(f" {Colors.BOLD}⚙️  Backend REST API:{Colors.ENDC}       http://localhost:{port}/api")
+        print(f" {Colors.BOLD}📊 Resource Monitor:{Colors.ENDC}       http://127.0.0.1:{monitor_port}/metrics")
+        print(f"\n {Colors.BOLD}👉 Command to start website server:{Colors.ENDC} node backend/server.js")
+        print(f" {Colors.BOLD}👉 Command to auto-run setup & launch:{Colors.ENDC} python start.py --run")
+
+    print(f"{Colors.BOLD}{Colors.OKGREEN}─────────────────────────────────────────────────────────────────────────────{Colors.ENDC}\n")
 
 def main():
     parser = argparse.ArgumentParser(description="Medhashree Cross-Platform Automated Setup & Hosting Script")
@@ -131,8 +151,8 @@ def main():
     # 6. Nginx & Security
     setup_nginx(ROOT_DIR, env_vars, domain=args.domain)
 
-    # 7. Verification check
-    verify_and_start_all(ROOT_DIR, env_vars)
+    # 7. Verification check & Live Links display
+    verify_and_start_all(ROOT_DIR, env_vars, domain=args.domain)
 
     # 8. Auto-start server if --run flag provided
     if args.run:

@@ -75,7 +75,9 @@ def install_system_dependencies():
             except ImportError:
                 pkg_name = 'python-dotenv' if pkg == 'dotenv' else pkg
                 log_info(f"Installing missing Python package '{pkg_name}'...")
-                run_cmd(f'"{sys.executable}" -m pip install {pkg_name}', check=False)
+                res = run_cmd(f'"{sys.executable}" -m pip install {pkg_name}', check=False, capture_output=True)
+                if res.returncode != 0:
+                    run_cmd(f"pip install {pkg_name}", check=False, capture_output=True)
 
         # Verify PM2 on Windows
         if shutil.which('pm2') is None:
