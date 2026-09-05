@@ -9,7 +9,10 @@ const useSsl = env.DB_SSL === 'true' || (env.NODE_ENV === 'production' && env.DB
 const poolConfig = env.DATABASE_URL
   ? {
       connectionString: env.DATABASE_URL,
-      ssl: useSsl ? { rejectUnauthorized: false } : false
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
+      max: parseInt(process.env.PG_POOL_MAX || '25', 10),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000
     }
   : {
       host: env.DB_HOST,
@@ -17,7 +20,10 @@ const poolConfig = env.DATABASE_URL
       user: env.DB_USER,
       password: env.DB_PASSWORD,
       database: env.DB_NAME,
-      ssl: useSsl ? { rejectUnauthorized: false } : false
+      ssl: useSsl ? { rejectUnauthorized: false } : false,
+      max: parseInt(process.env.PG_POOL_MAX || '25', 10),
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 5000
     };
 
 // Instantiate main pool (connection will be opened after checking/creating DB)

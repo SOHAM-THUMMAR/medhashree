@@ -20,6 +20,11 @@ def setup_nginx(root_dir: Path, env_vars: dict, domain: str = None):
     server_name = domain if domain else "_"
 
     nginx_config = f"""# Medhashree Production Nginx Site Configuration
+upstream backend_nodes {{
+    server 127.0.0.1:{backend_port} max_fails=3 fail_timeout=10s;
+    keepalive 64;
+}}
+
 server {{
     listen 80;
     listen [::]:80;
@@ -46,8 +51,9 @@ server {{
 
     # REST API Reverse Proxy
     location /api/ {{
-        proxy_pass http://127.0.0.1:{backend_port}/;
+        proxy_pass http://backend_nodes/;
         proxy_http_version 1.1;
+        proxy_set_header Connection "";
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;

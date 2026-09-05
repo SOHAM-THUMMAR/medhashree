@@ -34,10 +34,12 @@ def build_backend_and_start_pm2(root_dir: Path, env_vars: dict):
       name: 'medhashree-backend',
       script: 'server.js',
       cwd: '{backend_dir.as_posix()}',
-      instances: 1,
+      instances: 2,
+      exec_mode: 'cluster',
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
+      max_memory_restart: '900M',
+      node_args: '--max-old-space-size=768',
       env: {{
         NODE_ENV: 'production',
         PORT: {port}
@@ -50,6 +52,7 @@ def build_backend_and_start_pm2(root_dir: Path, env_vars: dict):
       cwd: '{root_dir.as_posix()}',
       autorestart: true,
       watch: false,
+      max_memory_restart: '100M',
       env: {{
         MONITOR_PORT: {monitor_port}
       }}

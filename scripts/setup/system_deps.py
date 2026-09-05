@@ -58,4 +58,31 @@ def install_system_dependencies():
         log_info("Installing PM2 process manager globally...")
         run_cmd("npm install -g pm2")
 
+    # Setup 2 GB Swap file for 4 GB RAM VPS stability
+    setup_swap_file()
+
     log_success("System dependencies verified & installed successfully.")
+
+def setup_swap_file():
+    """Ensure a 2 GB swapfile is present to prevent Linux OOM crashes under high traffic"""
+    if not is_ubuntu():
+        return
+    res = run_cmd("swapon --show", capture_output=True, check=False)
+    if res.stdout and len(res.stdout.strip()) > 0:
+        log_info("Linux Swap is already active.")
+        return
+
+    log_info("Creating a 2 GB Linux Swap file (/swapfile) for memory protection...")
+    try:
+        run_cmd("fallocate -l 2G /swapfile", check=False)
+        run_cmd("chmod 600 /swapfile", check=False)
+        run_cmd("mkswap /swapfile", check=False)
+        run_cmd("swapon /swapfile", check=False)
+        run_cmd("sysctl vm.swappiness=10", check=False)
+        fstab = run_cmd("cat /etc/fstab", capture_output=True, check=False).stdout or ""
+        if "/swapfile" not in fstab:
+            run_cmd('echo "/swapfile none swap sw 0 0" >> /etc/fstab', check=False)
+        log_success("2 GB Linux Swap file activated successfully.")
+    except Exception as e:
+        log_warn(f"Swap setup notice: {e}")
+

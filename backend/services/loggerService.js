@@ -219,6 +219,22 @@ class LoggerService {
       return { totalLogs: 0, todayLogs: 0, securityEvents: 0, errorEvents: 0, topActions: [] };
     }
   }
+
+  /**
+   * Prune activity logs older than retention days (default 60 days) to optimize DB storage
+   */
+  async pruneOldLogs(days = 60) {
+    try {
+      const res = await db.query(
+        "DELETE FROM activity_logs WHERE created_at < NOW() - (INTERVAL '1 day' * $1)",
+        [days]
+      );
+      return { deletedCount: res.rowCount };
+    } catch (err) {
+      console.error('[LoggerService Prune Error]', err.message);
+      return { deletedCount: 0 };
+    }
+  }
 }
 
 module.exports = new LoggerService();

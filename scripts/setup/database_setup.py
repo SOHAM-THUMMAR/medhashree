@@ -37,4 +37,16 @@ def setup_postgresql(env_vars: dict):
         """
         subprocess.run(f'sudo -u postgres psql -c "{sql_commands}"', shell=True, check=False)
 
-    log_success("PostgreSQL user and database configured.")
+    # 4 GB RAM VPS PostgreSQL Performance Tuning
+    log_info("Applying 4 GB RAM PostgreSQL memory and pool optimizations...")
+    pg_tune_commands = """
+    ALTER SYSTEM SET shared_buffers = '1GB';
+    ALTER SYSTEM SET work_mem = '16MB';
+    ALTER SYSTEM SET maintenance_work_mem = '256MB';
+    ALTER SYSTEM SET effective_cache_size = '2GB';
+    ALTER SYSTEM SET max_connections = '100';
+    SELECT pg_reload_conf();
+    """
+    subprocess.run(f'sudo -u postgres psql -c "{pg_tune_commands}"', shell=True, check=False)
+
+    log_success("PostgreSQL user, database, and 4 GB RAM performance tuning configured.")
