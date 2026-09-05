@@ -8,23 +8,23 @@ const useSsl = env.DB_SSL === 'true' || (env.NODE_ENV === 'production' && env.DB
 
 const poolConfig = env.DATABASE_URL
   ? {
-      connectionString: env.DATABASE_URL,
-      ssl: useSsl ? { rejectUnauthorized: false } : false,
-      max: parseInt(process.env.PG_POOL_MAX || '25', 10),
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000
-    }
+    connectionString: env.DATABASE_URL,
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
+    max: parseInt(process.env.PG_POOL_MAX || '25', 10),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000
+  }
   : {
-      host: env.DB_HOST,
-      port: env.DB_PORT,
-      user: env.DB_USER,
-      password: env.DB_PASSWORD,
-      database: env.DB_NAME,
-      ssl: useSsl ? { rejectUnauthorized: false } : false,
-      max: parseInt(process.env.PG_POOL_MAX || '25', 10),
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000
-    };
+    host: env.DB_HOST,
+    port: env.DB_PORT,
+    user: env.DB_USER,
+    password: env.DB_PASSWORD,
+    database: env.DB_NAME,
+    ssl: useSsl ? { rejectUnauthorized: false } : false,
+    max: parseInt(process.env.PG_POOL_MAX || '25', 10),
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000
+  };
 
 // Instantiate main pool (connection will be opened after checking/creating DB)
 const pool = new Pool(poolConfig);
@@ -41,7 +41,7 @@ const ensureDatabaseExists = async () => {
 
   try {
     await client.connect();
-    
+
     // Check if the target database exists
     const res = await client.query(
       "SELECT 1 FROM pg_database WHERE datname = $1",
@@ -72,7 +72,7 @@ const schemaQueries = [
     key VARCHAR(255) PRIMARY KEY,
     value TEXT NOT NULL
   )`,
-  
+
   // Users
   `CREATE TABLE IF NOT EXISTS users (
     user_id         SERIAL PRIMARY KEY,
@@ -398,7 +398,7 @@ const initialize = async () => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         console.log(`Connecting to database (attempt ${attempt}/${maxRetries})...`);
-        
+
         await new Promise((resolve, reject) => {
           pool.connect((err, client, release) => {
             if (err) {
@@ -415,13 +415,13 @@ const initialize = async () => {
         break;
       } catch (err) {
         console.warn(`Connection attempt ${attempt} failed: ${err.message}`);
-        
+
         // If it is the first attempt and the error indicates the database does not exist,
         // and we have local environment configuration (no DATABASE_URL or localhost),
         // try to create the database automatically using standard credentials on the default postgres db.
         const isDbDoesNotExist = err.code === '3D000' || (err.message && err.message.includes('does not exist'));
         const isLocal = !env.DATABASE_URL || env.DB_HOST === 'localhost' || env.DB_HOST === '127.0.0.1';
-        
+
         if (attempt === 1 && isDbDoesNotExist && isLocal) {
           console.log('Target database does not exist and running locally. Attempting automatic creation...');
           try {
@@ -431,7 +431,7 @@ const initialize = async () => {
             console.error('Failed to automatically create database:', createErr.message);
           }
         }
-        
+
         if (attempt < maxRetries) {
           console.log(`Waiting ${retryIntervalMs / 1000} seconds before next attempt...`);
           await new Promise(resolve => setTimeout(resolve, retryIntervalMs));
@@ -460,7 +460,7 @@ const initialize = async () => {
     await pool.query('ALTER TABLE quiz_sessions ADD COLUMN IF NOT EXISTS user2_completed BOOLEAN DEFAULT FALSE');
     await pool.query('ALTER TABLE quiz_session_questions ADD COLUMN IF NOT EXISTS user1_time_sec INTEGER DEFAULT 0');
     await pool.query('ALTER TABLE quiz_session_questions ADD COLUMN IF NOT EXISTS user2_time_sec INTEGER DEFAULT 0');
-    
+
     // C3. Performance Indexing for highly constrained environments (1 Core / 1 GB RAM)
     await pool.query('CREATE INDEX IF NOT EXISTS idx_quiz_sessions_user1 ON quiz_sessions(user1_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_quiz_sessions_user2 ON quiz_sessions(user2_id)');
@@ -474,20 +474,32 @@ const initialize = async () => {
     console.log('Performance database indexes verified/created successfully.');
     console.log('Database migrations verified/executed successfully.');
 
-    // C4. Seed default owner/admin account if no admin exists
-    const adminEmail = env.ADMIN_EMAIL || 'admin@medhashree.com';
-    const adminCheck = await pool.query("SELECT * FROM users WHERE role = 'admin' OR email = $1", [adminEmail]);
-    if (adminCheck.rows.length === 0) {
-      const defaultPassword = process.env.INITIAL_ADMIN_PASSWORD || 'Admin@12345';
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(defaultPassword, salt);
+    // C4. Seed default owner/admin account(s) if missing or grant admin role
+    const adminEmails = Array.from(new Set([
+      'sohamthummar04@gmail.com',
+      'sohamthummae04@gmail.com',
+      env.ADMIN_EMAIL
+    ])).filter(Boolean);
 
-      await pool.query(
-        `INSERT INTO users (full_name, email, username, password_hash, role)
-         VALUES ($1, $2, $3, $4, 'admin')`,
-        ['System Owner', adminEmail, 'owner', passwordHash]
-      );
-      console.log(`[DB INIT] 👑 Default Owner Account created: ${adminEmail} (Role: admin)`);
+    for (const email of adminEmails) {
+      const adminCheck = await pool.query("SELECT * FROM users WHERE email = $1", [email]);
+      if (adminCheck.rows.length === 0) {
+        const defaultPassword = process.env.INITIAL_ADMIN_PASSWORD || 'Admin@12345';
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(defaultPassword, salt);
+        const username = email.split('@')[0];
+
+        await pool.query(
+          `INSERT INTO users (full_name, email, username, password_hash, role)
+           VALUES ($1, $2, $3, $4, 'admin')
+           ON CONFLICT (email) DO UPDATE SET role = 'admin'`,
+          ['System Admin', email, username, passwordHash]
+        );
+        console.log(`[DB INIT] 👑 Admin Account created/seeded: ${email} (Role: admin)`);
+      } else if (adminCheck.rows[0].role !== 'admin') {
+        await pool.query("UPDATE users SET role = 'admin' WHERE email = $1", [email]);
+        console.log(`[DB INIT] 👑 Admin role granted to existing account: ${email}`);
+      }
     }
 
     // D. Seed default site settings if they don't exist
