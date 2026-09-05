@@ -1,43 +1,14 @@
 const db = require('../config/db');
-const QuizModel = require('../models/quizModel');
 const QuestionModel = require('../models/questionModel');
-const ActivityModel = require('../models/activityModel');
-const loggerService = require('../services/loggerService');
-const presenceService = require('../services/presenceService');
-const alertEmailService = require('../services/alertEmailService');
 const { success, error } = require('../utils/apiResponse');
 
-// @desc    Get admin dashboard stats
-// @route   GET /api/admin/dashboard
-// @access  Admin
-exports.getDashboardStats = async (req, res) => {
-  try {
-    const usersCount = await db.query('SELECT COUNT(*) FROM users');
-    const quizzesCount = await db.query('SELECT COUNT(*) FROM question_files');
-    const tournamentsCount = await db.query("SELECT COUNT(*) FROM tournaments WHERE status = 'active' OR status = 'upcoming'");
-    const reportsCount = await db.query("SELECT COUNT(*) FROM bug_reports WHERE status = 'unresolved'");
+// Import modular admin controllers
+const adminDashboardController = require('./admin/adminDashboardController');
+const adminActivityLogController = require('./admin/adminActivityLogController');
+const adminAlertController = require('./admin/adminAlertController');
 
-    const recentActivity = await ActivityModel.getRecent(5);
-    const onlineUsers = presenceService.getOnlineCount();
-
-    return success(res, {
-      totalUsers: parseInt(usersCount.rows[0].count),
-      totalQuizzes: parseInt(quizzesCount.rows[0].count),
-      activeTournaments: parseInt(tournamentsCount.rows[0].count),
-      pendingReports: parseInt(reportsCount.rows[0].count),
-      onlineUsers,
-      recentActivity
-    }, 'Dashboard stats fetched');
-  } catch (err) {
-    console.error('Dashboard Stats Error:', err);
-    return error(res, 'Failed to fetch dashboard stats', 500);
-  }
-};
-
-// @desc    Get all users
-// @route   GET /api/admin/users
-// @access  Admin
-exports.getAllUsers = async (req, res) => {
+// User Management Controller Methods
+const getAllUsers = async (req, res) => {
   try {
     const result = await db.query(
       'SELECT user_id, full_name, email, username, role, total_points, is_active, created_at FROM users ORDER BY created_at DESC'
@@ -49,10 +20,7 @@ exports.getAllUsers = async (req, res) => {
   }
 };
 
-// @desc    Update user role
-// @route   PUT /api/admin/users/:id/role
-// @access  Admin
-exports.updateUserRole = async (req, res) => {
+const updateUserRole = async (req, res) => {
   try {
     const { role } = req.body;
     if (!['student', 'instructor', 'admin'].includes(role)) {
@@ -72,10 +40,7 @@ exports.updateUserRole = async (req, res) => {
   }
 };
 
-// @desc    Toggle user active status
-// @route   PUT /api/admin/users/:id/active
-// @access  Admin
-exports.toggleUserActive = async (req, res) => {
+const toggleUserActive = async (req, res) => {
   try {
     const { is_active } = req.body;
     const result = await db.query(
@@ -91,10 +56,7 @@ exports.toggleUserActive = async (req, res) => {
   }
 };
 
-// @desc    Delete user
-// @route   DELETE /api/admin/users/:id
-// @access  Admin
-exports.deleteUser = async (req, res) => {
+const deleteUser = async (req, res) => {
   try {
     await db.query('DELETE FROM users WHERE user_id = $1', [req.params.id]);
     return success(res, null, 'User deleted successfully');
@@ -104,51 +66,48 @@ exports.deleteUser = async (req, res) => {
   }
 };
 
-// @desc    Get all content (question files)
-// @route   GET /api/admin/content
-// @access  Admin
-exports.getAllContent = async (req, res) => {
+// Content Management Controller Methods
+const getAllContent = async (req, res) => {
   try {
-    const files = await QuizModel.getAllFiles();
-    return success(res, files, 'Content fetched successfully');
+    const result = await db.query(
+      `SELECT qf.*, u.username as uploader_name 
+       FROM question_files qf 
+       LEFT JOIN users u ON qf.uploaded_by = u.user_id 
+       ORDER BY qf.uploaded_at DESC`
+    );
+    return success(res, result.rows, 'Content fetched successfully');
   } catch (err) {
     console.error('Get Content Error:', err);
     return error(res, 'Failed to fetch content', 500);
   }
 };
 
-// @desc    Get questions in a file
-// @route   GET /api/admin/content/:fileId/questions
-// @access  Admin
-exports.getContentQuestions = async (req, res) => {
+const getContentQuestions = async (req, res) => {
   try {
-    const questions = await QuestionModel.getByFileId(req.params.fileId);
-    return success(res, questions, 'Questions fetched successfully');
+    const result = await db.query(
+      'SELECT * FROM questions WHERE file_id = $1 ORDER BY question_id ASC',
+      [req.params.fileId]
+    );
+    return success(res, result.rows, 'Questions fetched successfully');
   } catch (err) {
     console.error('Get Content Questions Error:', err);
     return error(res, 'Failed to fetch questions', 500);
   }
 };
 
-// @desc    Delete content file
-// @route   DELETE /api/admin/content/:fileId
-// @access  Admin
-exports.deleteContent = async (req, res) => {
+const deleteContent = async (req, res) => {
   try {
-    await QuizModel.deleteFile(req.params.fileId);
-    return success(res, null, 'Content deleted successfully');
+    await db.query('DELETE FROM question_files WHERE file_id = $1', [req.params.fileId]);
+    return success(res, null, 'Question paper deleted successfully');
   } catch (err) {
     console.error('Delete Content Error:', err);
     return error(res, 'Failed to delete content', 500);
   }
 };
 
-// @desc    Delete single question
-// @route   DELETE /api/admin/questions/:questionId
-// @access  Admin
-exports.deleteQuestion = async (req, res) => {
+const deleteQuestion = async (req, res) => {
   try {
-    await QuestionModel.delete(req.params.questionId);
+    await db.query('DELETE FROM questions WHERE question_id = $1', [req.params.questionId]);
     return success(res, null, 'Question deleted successfully');
   } catch (err) {
     console.error('Delete Question Error:', err);
@@ -156,10 +115,7 @@ exports.deleteQuestion = async (req, res) => {
   }
 };
 
-// @desc    Update a question
-// @route   PUT /api/admin/questions/:questionId
-// @access  Admin
-exports.updateQuestion = async (req, res) => {
+const updateQuestion = async (req, res) => {
   try {
     const { full_question_text, option_a, option_b, option_c, option_d, correct_answer, hint, explanation } = req.body;
 
@@ -187,10 +143,7 @@ exports.updateQuestion = async (req, res) => {
   }
 };
 
-// @desc    Update quiz / question paper metadata
-// @route   PUT /api/admin/content/:fileId
-// @access  Admin
-exports.updateContent = async (req, res) => {
+const updateContent = async (req, res) => {
   try {
     const { file_name, subject, topic, micro_topic, status, year, month, is_solved_paper } = req.body;
     const fileId = req.params.fileId;
@@ -205,7 +158,7 @@ exports.updateContent = async (req, res) => {
         topic,
         micro_topic,
         status || 'Draft',
-        year ? parseInt(year) : null,
+        year ? parseInt(year, 10) : null,
         month || null,
         is_solved_paper === true || is_solved_paper === 'true',
         fileId
@@ -223,179 +176,34 @@ exports.updateContent = async (req, res) => {
   }
 };
 
-// ──────────────────────────────────────────
-// Activity Logger, Resource Monitoring & Alert Endpoints
-// ──────────────────────────────────────────
+// Clean modular exports
+module.exports = {
+  // Dashboard
+  getDashboardStats: adminDashboardController.getDashboardStats,
 
-const resourceMonitorService = require('../services/resourceMonitorService');
+  // Users
+  getAllUsers,
+  updateUserRole,
+  toggleUserActive,
+  deleteUser,
 
-// @desc    Get real-time server resource monitoring metrics (CPU, RAM, DB Pool, Uptime)
-// @route   GET /api/admin/resource-stats
-// @access  Admin
-exports.getResourceStats = async (req, res) => {
-  try {
-    const stats = await resourceMonitorService.getResourceStats();
-    return success(res, stats, 'Resource monitoring stats fetched');
-  } catch (err) {
-    console.error('Get Resource Stats Error:', err);
-    return error(res, 'Failed to fetch resource stats', 500);
-  }
+  // Content
+  getAllContent,
+  getContentQuestions,
+  deleteContent,
+  deleteQuestion,
+  updateQuestion,
+  updateContent,
+
+  // Activity Logs & Resource Monitoring
+  getResourceStats: adminActivityLogController.getResourceStats,
+  getActivityLogs: adminActivityLogController.getActivityLogs,
+  getActivityLogStats: adminActivityLogController.getActivityLogStats,
+  exportActivityLogs: adminActivityLogController.exportActivityLogs,
+  getOnlineUserCount: adminActivityLogController.getOnlineUserCount,
+
+  // Email Threshold Alerts
+  sendTestAlertEmail: adminAlertController.sendTestAlertEmail,
+  getAlertConfig: adminAlertController.getAlertConfig,
+  updateAlertConfig: adminAlertController.updateAlertConfig
 };
-
-
-// @desc    Get paginated activity logs
-// @route   GET /api/admin/activity-logs
-// @access  Admin
-exports.getActivityLogs = async (req, res) => {
-  try {
-    const { page = 1, limit = 50, severity, action, search, startDate, endDate } = req.query;
-    const result = await loggerService.getLogs({ page, limit, severity, action, search, startDate, endDate });
-    return success(res, result, 'Activity logs fetched successfully');
-  } catch (err) {
-    console.error('Get Activity Logs Error:', err);
-    return error(res, 'Failed to fetch activity logs', 500);
-  }
-};
-
-// @desc    Get activity log statistics
-// @route   GET /api/admin/activity-logs/stats
-// @access  Admin
-exports.getActivityLogStats = async (req, res) => {
-  try {
-    const stats = await loggerService.getStats();
-    return success(res, stats, 'Activity log statistics fetched');
-  } catch (err) {
-    console.error('Get Activity Log Stats Error:', err);
-    return error(res, 'Failed to fetch log statistics', 500);
-  }
-};
-
-// @desc    Export activity logs (JSON or CSV)
-// @route   GET /api/admin/activity-logs/export
-// @access  Admin
-exports.exportActivityLogs = async (req, res) => {
-  try {
-    const { format = 'csv', severity, action, search } = req.query;
-    const result = await loggerService.getLogs({ page: 1, limit: 5000, severity, action, search });
-
-    if (format === 'json') {
-      res.setHeader('Content-Type', 'application/json');
-      res.setHeader('Content-Disposition', 'attachment; filename="activity_logs.json"');
-      return res.send(JSON.stringify(result.logs, null, 2));
-    }
-
-    // CSV Format
-    const headers = ['Log ID', 'Created At', 'Severity', 'Action', 'User ID', 'Username', 'Role', 'Method', 'Endpoint', 'IP Address', 'Status Code'];
-    const rows = result.logs.map(log => [
-      log.log_id,
-      `"${new Date(log.created_at).toISOString()}"`,
-      `"${log.severity}"`,
-      `"${log.action}"`,
-      log.user_id || '',
-      `"${log.username || ''}"`,
-      `"${log.role || ''}"`,
-      `"${log.method || ''}"`,
-      `"${log.endpoint || ''}"`,
-      `"${log.ip_address || ''}"`,
-      log.status_code || ''
-    ]);
-
-    const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="activity_logs.csv"');
-    return res.send(csvContent);
-  } catch (err) {
-    console.error('Export Activity Logs Error:', err);
-    return error(res, 'Failed to export activity logs', 500);
-  }
-};
-
-// @desc    Get current real-time online user count
-// @route   GET /api/admin/online-users
-// @access  Admin
-exports.getOnlineUserCount = async (req, res) => {
-  try {
-    const count = presenceService.getOnlineCount();
-    return success(res, { onlineUsers: count }, 'Online user count fetched');
-  } catch (err) {
-    console.error('Get Online User Count Error:', err);
-    return error(res, 'Failed to fetch online user count', 500);
-  }
-};
-
-// @desc    Send test alert email to specified or admin email
-// @route   POST /api/admin/alerts/test
-// @access  Admin
-exports.sendTestAlertEmail = async (req, res) => {
-  try {
-    const { targetEmail } = req.body;
-    const recipient = targetEmail || await alertEmailService.getRecipientEmail();
-
-    await alertEmailService.sendTestEmail(recipient);
-    return success(res, { recipient }, `Test alert email sent to ${recipient}`);
-  } catch (err) {
-    console.error('Test Alert Email Error:', err);
-    return error(res, `Failed to send test email: ${err.message}`, 400);
-  }
-};
-
-// @desc    Get threshold email alert configuration
-// @route   GET /api/admin/alerts/config
-// @access  Admin
-exports.getAlertConfig = async (req, res) => {
-  try {
-    const config = await alertEmailService.getThresholdConfig();
-    const recipientEmail = await alertEmailService.getRecipientEmail();
-    return success(res, { ...config, recipientEmail }, 'Alert configuration fetched');
-  } catch (err) {
-    console.error('Get Alert Config Error:', err);
-    return error(res, 'Failed to fetch alert config', 500);
-  }
-};
-
-// @desc    Update threshold email alert configuration
-// @route   PUT /api/admin/alerts/config
-// @access  Admin
-exports.updateAlertConfig = async (req, res) => {
-  try {
-    const { threshold, enabled, cooldownMinutes, recipientEmail } = req.body;
-
-    if (threshold !== undefined) {
-      await db.query(
-        "INSERT INTO site_settings (key, value) VALUES ('online_user_alert_threshold', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-        [String(threshold)]
-      );
-    }
-
-    if (enabled !== undefined) {
-      await db.query(
-        "INSERT INTO site_settings (key, value) VALUES ('enable_online_alerts', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-        [String(enabled)]
-      );
-    }
-
-    if (cooldownMinutes !== undefined) {
-      await db.query(
-        "INSERT INTO site_settings (key, value) VALUES ('alert_cooldown_minutes', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-        [String(cooldownMinutes)]
-      );
-    }
-
-    if (recipientEmail) {
-      await db.query(
-        "INSERT INTO site_settings (key, value) VALUES ('alert_email', $1) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value",
-        [recipientEmail]
-      );
-    }
-
-    const updatedConfig = await alertEmailService.getThresholdConfig();
-    const updatedRecipient = await alertEmailService.getRecipientEmail();
-
-    return success(res, { ...updatedConfig, recipientEmail: updatedRecipient }, 'Alert configuration updated');
-  } catch (err) {
-    console.error('Update Alert Config Error:', err);
-    return error(res, 'Failed to update alert config', 500);
-  }
-};
-
