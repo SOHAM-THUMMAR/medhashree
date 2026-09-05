@@ -5,6 +5,48 @@ const LOGS_DIR = path.join(__dirname, '../logs');
 const LOGS_FILE = path.join(LOGS_DIR, 'activity.json');
 const MAX_IN_MEMORY_LOGS = 10000;
 
+/**
+ * Clean and format IP address (strips ::ffff:, handles commas from proxies, normalizes loopbacks)
+ */
+function normalizeIpAddress(ip) {
+  if (!ip) return '127.0.0.1';
+  let cleanIp = String(ip).trim();
+
+  // If header has multiple IPs (e.g. X-Forwarded-For: 203.0.113.195, 70.41.3.18)
+  if (cleanIp.includes(',')) {
+    cleanIp = cleanIp.split(',')[0].trim();
+  }
+
+  // Remove IPv6 mapping prefix ::ffff:
+  if (cleanIp.startsWith('::ffff:')) {
+    cleanIp = cleanIp.replace('::ffff:', '');
+  }
+
+  // Normalize IPv6 loopback
+  if (cleanIp === '::1' || cleanIp.toLowerCase() === 'localhost') {
+    return '127.0.0.1';
+  }
+
+  return cleanIp;
+}
+
+/**
+ * Clean and format Endpoint URL (fixes double /api/api, trims whitespace)
+ */
+function normalizeEndpoint(endpoint) {
+  if (!endpoint) return '/';
+  let url = String(endpoint).trim();
+
+  // Fix double /api/api
+  url = url.replace(/^\/api\/api\//, '/api/');
+
+  if (url.length > 300) {
+    url = url.substring(0, 300) + '...';
+  }
+
+  return url;
+}
+
 class LoggerService {
   constructor() {
     this.logs = [];
@@ -94,14 +136,28 @@ class LoggerService {
   }
 
   /**
-   * Automatically enrich all logs with user email addresses & handles
+   * Automatically enrich all logs with user email addresses, handles, normalized IPs and clean URLs
    */
   async _enrichLogs() {
     await this._loadUserCache();
     let modified = false;
 
     for (const log of this.logs) {
-      // 1. Enrich by user_id
+      // 1. Normalize IP address
+      const normIp = normalizeIpAddress(log.ip_address);
+      if (log.ip_address !== normIp) {
+        log.ip_address = normIp;
+        modified = true;
+      }
+
+      // 2. Normalize Endpoint URL
+      const normUrl = normalizeEndpoint(log.endpoint);
+      if (log.endpoint !== normUrl) {
+        log.endpoint = normUrl;
+        modified = true;
+      }
+
+      // 3. Enrich by user_id
       if (log.user_id != null && (this.userCache.has(log.user_id) || this.userCache.has(String(log.user_id)))) {
         const u = this.userCache.get(log.user_id) || this.userCache.get(String(log.user_id));
         if (!log.email && u.email) {
@@ -114,7 +170,7 @@ class LoggerService {
         }
       }
 
-      // 2. Enrich by username
+      // 4. Enrich by username
       if (!log.email && log.username && (this.userCache.has(log.username) || this.userCache.has(String(log.username).toLowerCase()))) {
         const u = this.userCache.get(log.username) || this.userCache.get(String(log.username).toLowerCase());
         if (u && u.email) {
@@ -123,7 +179,7 @@ class LoggerService {
         }
       }
 
-      // 3. Enrich by details.email
+      // 5. Enrich by details.email
       if (!log.email && log.details && typeof log.details === 'object' && log.details.email) {
         log.email = log.details.email;
         modified = true;
@@ -183,9 +239,9 @@ class LoggerService {
         email: userEmail,
         role: role || 'guest',
         action,
-        method,
-        endpoint,
-        ip_address: ipAddress || '127.0.0.1',
+        method: method ? String(method).toUpperCase() : 'GET',
+        endpoint: normalizeEndpoint(endpoint),
+        ip_address: normalizeIpAddress(ipAddress),
         user_agent: userAgent ? String(userAgent).substring(0, 300) : null,
         status_code: statusCode,
         severity: severity || 'info',
