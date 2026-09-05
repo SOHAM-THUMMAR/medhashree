@@ -14,8 +14,8 @@ export default function useGoogleAuth({ onSuccess, onError }) {
     // Load Google script
     useEffect(() => {
         if (window.google?.accounts?.id) {
-            setScriptLoaded(true);
-            return;
+            const timer = setTimeout(() => setScriptLoaded(true), 0);
+            return () => clearTimeout(timer);
         }
 
         const existing = document.querySelector(

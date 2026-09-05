@@ -21,10 +21,6 @@ function ManageCategories() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
 
-    useEffect(() => {
-        fetchCategories();
-    }, []);
-
     const fetchCategories = async () => {
         try {
             const res = await authFetch(`${API_BASE}/categories`);
@@ -38,6 +34,13 @@ function ManageCategories() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchCategories();
+        }, 0);
+        return () => clearTimeout(timer);
+    }, []);
 
     const handleOpenForm = (category = null) => {
         setMessage('');

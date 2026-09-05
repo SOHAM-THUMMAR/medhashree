@@ -21,10 +21,6 @@ function ManageSelfStudy() {
     const [saving, setSaving] = useState(false);
     const [message, setMessage] = useState('');
 
-    useEffect(() => {
-        fetchPaths();
-    }, []);
-
     const fetchPaths = async () => {
         try {
             // Updated fetch endpoint
@@ -39,6 +35,13 @@ function ManageSelfStudy() {
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            fetchPaths();
+        }, 0);
+        return () => clearTimeout(timer);
+    }, []);
 
     const handleOpenForm = (pathItem = null) => {
         setMessage('');

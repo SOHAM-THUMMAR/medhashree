@@ -44,7 +44,7 @@ function QuizPlayView() {
     // Timer state
     const [timePerQuestion, setTimePerQuestion] = useState(60);
     const [timeLeft, setTimeLeft] = useState(60);
-    const [questionStartTime, setQuestionStartTime] = useState(Date.now());
+    const [questionStartTime, setQuestionStartTime] = useState(() => Date.now());
     const timerRef = useRef(null);
 
     useEffect(() => {

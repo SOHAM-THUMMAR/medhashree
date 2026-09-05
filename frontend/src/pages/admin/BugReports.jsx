@@ -1,11 +1,9 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import { API_BASE, authFetch } from '../../config/api';
 import { useSearch } from '../../context/SearchContext';
 import AdminNavBanner from '../../components/admin/AdminNavBanner';
 
 function BugReports() {
-    const navigate = useNavigate();
     const { debouncedQuery } = useSearch();
     const [reports, setReports] = useState([]);
 

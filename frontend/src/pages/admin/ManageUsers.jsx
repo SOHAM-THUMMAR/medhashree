@@ -63,7 +63,10 @@ function ManageUsers() {
     };
 
     useEffect(() => {
-        fetchUsers();
+        const timer = setTimeout(() => {
+            fetchUsers();
+        }, 0);
+        return () => clearTimeout(timer);
     }, []);
 
     // Update Role handler
@@ -142,7 +145,7 @@ function ManageUsers() {
             } else {
                 setModalMessage({ type: 'error', text: data.error || 'Failed to update password' });
             }
-        } catch (err) {
+        } catch {
             setModalMessage({ type: 'error', text: 'Server error updating password' });
         } finally {
             setModalSubmitting(false);

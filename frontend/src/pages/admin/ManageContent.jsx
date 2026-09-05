@@ -125,7 +125,10 @@ function ManageContent() {
     };
 
     useEffect(() => {
-        fetchFixedQuizzes();
+        const timer = setTimeout(() => {
+            fetchFixedQuizzes();
+        }, 0);
+        return () => clearTimeout(timer);
     }, []);
 
     const presets = {
@@ -218,10 +221,13 @@ function ManageContent() {
         const tab = searchParams.get('tab');
         const action = searchParams.get('action');
         if (tab === 'fixed') {
-            setActiveTab('fixed');
-            if (action === 'new') {
-                handleCreateNewFixedQuiz();
-            }
+            const timer = setTimeout(() => {
+                setActiveTab('fixed');
+                if (action === 'new') {
+                    handleCreateNewFixedQuiz();
+                }
+            }, 0);
+            return () => clearTimeout(timer);
         }
     }, [searchParams]);
 

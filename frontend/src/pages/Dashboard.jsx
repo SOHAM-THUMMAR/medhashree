@@ -18,21 +18,24 @@ function Dashboard() {
         dailyActivity: [],
         bestSubjects: []
     });
-    const [user, setUser] = useState({ full_name: 'Guest' });
+    const [user] = useState(() => {
+        try {
+            const storedUser = localStorage.getItem('user');
+            return storedUser ? JSON.parse(storedUser) : { full_name: 'Guest' };
+        } catch {
+            return { full_name: 'Guest' };
+        }
+    });
     const [loading, setLoading] = useState(true);
     const navigate = useNavigate();
 
     useEffect(() => {
-        const storedUser = localStorage.getItem('user');
-        if (storedUser) {
-            const parsedUser = JSON.parse(storedUser);
-            setUser(parsedUser);
-
+        if (user && user.user_id) {
             const fetchDashboardData = async () => {
                 try {
                     const [dashboardRes, rankRes] = await Promise.all([
-                        fetch(`${API_BASE}/users/dashboard/${parsedUser.user_id}`),
-                        fetch(`${API_BASE}/leaderboard/rank/${parsedUser.user_id}`)
+                        fetch(`${API_BASE}/users/dashboard/${user.user_id}`),
+                        fetch(`${API_BASE}/leaderboard/rank/${user.user_id}`)
                     ]);
                     
                     const data = await dashboardRes.json();
@@ -53,9 +56,10 @@ function Dashboard() {
             };
             fetchDashboardData();
         } else {
-            setLoading(false);
+            const timer = setTimeout(() => setLoading(false), 0);
+            return () => clearTimeout(timer);
         }
-    }, []);
+    }, [user]);
 
     // Helper to generate the last 70 days divided into 10 columns (weeks) x 7 rows (days)
     const generateCalendarGrid = (dailyActivity = []) => {

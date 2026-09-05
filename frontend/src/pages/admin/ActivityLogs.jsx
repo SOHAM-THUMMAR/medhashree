@@ -121,12 +121,17 @@ function ActivityLogs() {
   }, [page, severityFilter, actionFilter, searchQuery, startDate, endDate]);
 
   useEffect(() => {
-    fetchLogs();
-    fetchStatsAndOnline();
-    fetchAlertConfig();
+    const timer = setTimeout(() => {
+      fetchLogs();
+      fetchStatsAndOnline();
+      fetchAlertConfig();
+    }, 0);
 
     const interval = setInterval(fetchStatsAndOnline, 15000);
-    return () => clearInterval(interval);
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, [fetchLogs]);
 
   // Handle saving threshold alert config

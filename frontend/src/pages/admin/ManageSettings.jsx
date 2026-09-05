@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../../config/api';
 import AuthMarketingPane from '../../components/AuthMarketingPane';
 import AdminNavBanner from '../../components/admin/AdminNavBanner';
 
 function ManageSettings() {
-    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('hero'); // 'hero', 'stats', 'auth'
     const [previewAuthScreen, setPreviewAuthScreen] = useState('login'); // 'login', 'register', 'forgot'
     const [loading, setLoading] = useState(true);

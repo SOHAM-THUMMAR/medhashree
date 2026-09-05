@@ -40,8 +40,8 @@ function SolvedPapers({ isPublic = false }) {
 
   // Question Traversal Jump Search State
   const [searchQNumber, setSearchQNumber] = useState('');
-  const [showJumpBar, setShowJumpBar] = useState(false);
   const readerRef = useRef(null);
+  const showJumpBar = Boolean(viewingPaper && questions.length > 0);
 
   useEffect(() => {
     const fetchSolvedPapers = async () => {
@@ -106,16 +106,6 @@ function SolvedPapers({ isPublic = false }) {
       };
     });
   };
-
-  // Show/hide jump bar when viewing questions
-  useEffect(() => {
-    if (viewingPaper && questions.length > 0) {
-      setShowJumpBar(true);
-    } else {
-      setShowJumpBar(false);
-    }
-    return () => setShowJumpBar(false);
-  }, [viewingPaper, questions]);
 
   // Traversal Jump Handler
   const handleJumpToQuestion = () => {
