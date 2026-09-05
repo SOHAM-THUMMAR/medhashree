@@ -14,7 +14,7 @@ function ActivityLogs() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
   const [severityFilter, setSeverityFilter] = useState('all');
-  const [actionFilter, setActionFilter] = useState('');
+  const [actionFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
 
   // Stats state
@@ -108,7 +108,7 @@ function ActivityLogs() {
       } else {
         setError(data.error || 'Failed to load activity logs');
       }
-    } catch (err) {
+    } catch {
       setError('Server communication error');
     } finally {
       setLoading(false);
@@ -146,7 +146,7 @@ function ActivityLogs() {
       } else {
         setAlertConfigMsg(data.error || 'Failed to save settings');
       }
-    } catch (e) {
+    } catch {
       setAlertConfigMsg('Server connection error');
     } finally {
       setAlertConfigSaving(false);
@@ -168,7 +168,7 @@ function ActivityLogs() {
       } else {
         setTestEmailMsg(`❌ Error: ${data.error}`);
       }
-    } catch (e) {
+    } catch {
       setTestEmailMsg('❌ Failed to connect to server');
     } finally {
       setTestingEmail(false);

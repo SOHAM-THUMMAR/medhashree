@@ -76,7 +76,7 @@ function CreateQuiz() {
             } else {
                 setMessage(data.error || 'Upload failed');
             }
-        } catch (err) {
+        } catch {
             setMessage('Cannot connect to server. Please try again.');
         } finally {
             setUploading(false);

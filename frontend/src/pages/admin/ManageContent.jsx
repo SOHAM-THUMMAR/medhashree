@@ -12,7 +12,7 @@ const parseOptionValue = (val) => {
       if (parsed.text !== undefined || parsed.image !== undefined) {
         return { text: parsed.text || '', image: parsed.image || null };
       }
-    } catch (e) {
+    } catch {
       // Fallback
     }
   }

@@ -9,13 +9,24 @@ export default function ProtectedRoute({ allowedRoles }) {
     }
 
     if (allowedRoles && userString) {
+        let isRoleAllowed = true;
+        let isJsonValid = true;
+
         try {
             const user = JSON.parse(userString);
             if (!allowedRoles.includes(user.role)) {
-                return <Navigate to="/" replace />;
+                isRoleAllowed = false;
             }
-        } catch (e) {
+        } catch {
+            isJsonValid = false;
+        }
+
+        if (!isJsonValid) {
             return <Navigate to="/login" replace />;
+        }
+
+        if (!isRoleAllowed) {
+            return <Navigate to="/" replace />;
         }
     }
 

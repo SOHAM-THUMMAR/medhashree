@@ -1,9 +1,7 @@
 import { useRef, useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { API_BASE, authFetch } from '../../config/api';
 
 function UploadSolvedPaper() {
-    const navigate = useNavigate();
     const fileInputRef = useRef(null);
     const [categories, setCategories] = useState([]);
     

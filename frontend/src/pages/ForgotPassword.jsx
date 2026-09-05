@@ -51,7 +51,7 @@ function ForgotPassword() {
       } else {
         setMessage({ text: data.error, type: 'error' });
       }
-    } catch (err) {
+    } catch {
       setMessage({ text: 'Network error. Please try again.', type: 'error' });
     } finally {
       setLoading(false);
@@ -77,7 +77,7 @@ function ForgotPassword() {
       } else {
         setMessage({ text: data.error, type: 'error' });
       }
-    } catch (err) {
+    } catch {
       setMessage({ text: 'Network error. Please try again.', type: 'error' });
     } finally {
       setLoading(false);
