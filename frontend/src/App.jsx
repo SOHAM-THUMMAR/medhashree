@@ -38,6 +38,8 @@ const ManageTournaments = lazy(() => import("./pages/admin/ManageTournaments"));
 const CreateTournament = lazy(() => import("./pages/admin/CreateTournament"));
 const ManageSettings = lazy(() => import("./pages/admin/ManageSettings"));
 const UploadSolvedPaper = lazy(() => import("./pages/admin/UploadSolvedPaper"));
+const ActivityLogs = lazy(() => import("./pages/admin/ActivityLogs"));
+
 
 // Loading fallback (minimal, matches dark theme)
 function PageLoader() {
@@ -107,6 +109,7 @@ function App() {
                   <Route path="/admin/create-tournament" element={<CreateTournament />} />
                   <Route path="/admin/settings" element={<ManageSettings />} />
                   <Route path="/admin/upload-solved" element={<UploadSolvedPaper />} />
+                  <Route path="/admin/activity-logs" element={<ActivityLogs />} />
                 </Route>
               </Route>
 

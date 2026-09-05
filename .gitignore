@@ -64,3 +64,9 @@ pids
 # Test coverage
 coverage/
 .nyc_output/
+
+# Temporary / Scratch directories
+temp_node_install/
+__pycache__/
+*.pyc
+

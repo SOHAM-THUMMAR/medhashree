@@ -2,6 +2,7 @@ const { verifyToken } = require('../utils/generateToken');
 const SessionModel = require('../models/sessionModel');
 const QuestionModel = require('../models/questionModel');
 const db = require('../config/db');
+const presenceService = require('../services/presenceService');
 
 /**
  * In-memory matchmaking queue
@@ -81,11 +82,20 @@ function getQueueSummary() {
  * Initialize battle socket handlers
  */
 function initBattleSocket(io) {
+  presenceService.setIo(io);
+
   // Apply authentication middleware
   io.use(authenticateSocket);
 
   io.on('connection', (socket) => {
     console.log(`[Socket] User ${socket.userId} connected (${socket.id})`);
+
+    // Admin socket joins admin room for presence broadcasts
+    if (socket.userRole === 'admin') {
+      socket.join('admin_room');
+    }
+
+    presenceService.handleConnect(socket, socket.userId, socket.userRole);
 
     // ─── FIND MATCH ───────────────────────────────────────────────
     socket.on('battle:find-match', async (data) => {
@@ -253,8 +263,10 @@ function initBattleSocket(io) {
     socket.on('disconnect', () => {
       console.log(`[Socket] User ${socket.userId} disconnected (${socket.id})`);
       removeFromQueue(socket.id);
+      presenceService.handleDisconnect(socket.id);
     });
   });
 }
 
 module.exports = initBattleSocket;
+

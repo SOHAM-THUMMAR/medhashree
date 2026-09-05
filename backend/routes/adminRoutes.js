@@ -23,4 +23,17 @@ router.put('/content/:fileId', adminController.updateContent);
 router.delete('/questions/:questionId', adminController.deleteQuestion);
 router.put('/questions/:questionId', adminController.updateQuestion);
 
-module.exports = router;
+// Activity Logger & Resource Monitoring
+router.get('/resource-stats', adminController.getResourceStats);
+router.get('/activity-logs', adminController.getActivityLogs);
+router.get('/activity-logs/stats', adminController.getActivityLogStats);
+router.get('/activity-logs/export', adminController.exportActivityLogs);
+
+
+// Real-time Presence & Alerts
+router.get('/online-users', adminController.getOnlineUserCount);
+router.get('/alerts/config', adminController.getAlertConfig);
+router.put('/alerts/config', adminController.updateAlertConfig);
+router.post('/alerts/test', adminController.sendTestAlertEmail);
+
+module.exports = router;

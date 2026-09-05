@@ -360,6 +360,23 @@ const schemaQueries = [
     gradient_to     VARCHAR(50) DEFAULT '#06b6d4',
     border_color    VARCHAR(50) DEFAULT '#6366f1',
     created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`,
+
+  // System & User Activity Logs
+  `CREATE TABLE IF NOT EXISTS activity_logs (
+    log_id          SERIAL PRIMARY KEY,
+    user_id         INTEGER REFERENCES users(user_id) ON DELETE SET NULL,
+    username        VARCHAR(100),
+    role            VARCHAR(20),
+    action          VARCHAR(100) NOT NULL,
+    method          VARCHAR(10),
+    endpoint        VARCHAR(255),
+    ip_address      VARCHAR(45),
+    user_agent      TEXT,
+    status_code     INTEGER,
+    severity        VARCHAR(20) DEFAULT 'info',
+    details         JSONB,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`
 ];
 
@@ -444,6 +461,9 @@ const initialize = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_user_activity_user ON user_activity(user_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_tournament_participants_user ON tournament_participants(user_id)');
     await pool.query('CREATE INDEX IF NOT EXISTS idx_questions_filters ON questions(category_id, subject_id, topic_id, micro_topic_id)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_created ON activity_logs(created_at DESC)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_severity ON activity_logs(severity)');
+    await pool.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs(action)');
     console.log('Performance database indexes verified/created successfully.');
     console.log('Database migrations verified/executed successfully.');
 

@@ -5,16 +5,20 @@ const { Server } = require('socket.io');
 const path = require('path');
 
 // Security & Rate Limiting
-let helmet;
-try { helmet = require('helmet'); } catch (e) { helmet = null; }
-let rateLimit;
-try { rateLimit = require('express-rate-limit'); } catch (e) { rateLimit = null; }
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
+const xss = require('xss');
 
 const env = require('./config/env');
 const db = require('./config/db'); // Will log connection status
+const activityLoggerMiddleware = require('./middleware/loggerMiddleware');
+const presenceService = require('./services/presenceService');
 
 const app = express();
 const server = http.createServer(app);
+
+// Trust proxy for Nginx / reverse proxy deployment
+app.set('trust proxy', 1);
 
 // Configure allowed origins based on FRONTEND_URL env var
 const allowedOrigins = env.FRONTEND_URL 
@@ -31,16 +35,16 @@ const io = new Server(server, {
 });
 
 // ──────────────────────────────────────────
-// Security Middleware
+// Security Middleware & Headers
 // ──────────────────────────────────────────
-if (helmet) {
-  app.use(helmet({
-    contentSecurityPolicy: false, // Disabled: SPA with inline scripts, MathJax CDN, Google OAuth
-    crossOriginEmbedderPolicy: false, // Disabled: allows loading Google OAuth, MathJax assets
-  }));
-} else if (env.NODE_ENV === 'production') {
-  console.warn('Warning: helmet is not installed. Run: npm install helmet');
-}
+app.use(helmet({
+  contentSecurityPolicy: false, // Disabled: SPA with inline scripts, MathJax CDN, Google OAuth
+  crossOriginEmbedderPolicy: false,
+  hsts: { maxAge: 31536000, includeSubDomains: true, preload: true },
+  frameguard: { action: 'deny' },
+  noSniff: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
+}));
 
 // Hide framework signature
 app.disable('x-powered-by');
@@ -51,24 +55,65 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE'],
   credentials: true
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Global Input Sanitization Middleware (XSS prevention)
+app.use((req, res, next) => {
+  if (req.body && typeof req.body === 'object') {
+    for (const key in req.body) {
+      if (typeof req.body[key] === 'string') {
+        req.body[key] = xss(req.body[key]);
+      }
+    }
+  }
+  next();
+});
+
+// Track REST API User Presence Heartbeat
+app.use((req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const { verifyToken } = require('./utils/generateToken');
+      const decoded = verifyToken(token);
+      if (decoded && decoded.userId) {
+        req.user = decoded;
+        presenceService.recordApiActivity(decoded.userId);
+      }
+    } catch (e) {
+      // Ignore token parse error for unauthenticated requests
+    }
+  }
+  next();
+});
+
+// Mount System Activity Logger
+app.use(activityLoggerMiddleware);
 
 // ──────────────────────────────────────────
-// Rate Limiting (Auth endpoints)
+// Rate Limiting
 // ──────────────────────────────────────────
-let authLimiter = null;
-if (rateLimit) {
-  authLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 20, // 20 attempts per window
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, error: 'Too many attempts. Please try again later.' }
-  });
-} else if (env.NODE_ENV === 'production') {
-  console.warn('Warning: express-rate-limit is not installed. Run: npm install express-rate-limit');
-}
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 mins
+  max: 500, // 500 requests per 15 minutes per IP
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many requests from this IP. Please try again later.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 15, // 15 auth attempts per window
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: 'Too many login/register attempts. Please try again later.' }
+});
+
+app.use('/api/', globalLimiter);
+
 
 // ──────────────────────────────────────────
 // Import ALL Routes

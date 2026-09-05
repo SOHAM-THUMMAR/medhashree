@@ -8,7 +8,8 @@ function AdminDashboard() {
         totalUsers: 0,
         totalQuizzes: 0,
         activeTournaments: 0,
-        pendingReports: 0
+        pendingReports: 0,
+        onlineUsers: 0
     });
     const [recentActivity, setRecentActivity] = useState([]);
     
@@ -29,7 +30,8 @@ function AdminDashboard() {
                         totalUsers: data.data.totalUsers || 0,
                         totalQuizzes: data.data.totalQuizzes || 0,
                         activeTournaments: data.data.activeTournaments || 0,
-                        pendingReports: data.data.pendingReports || 0
+                        pendingReports: data.data.pendingReports || 0,
+                        onlineUsers: data.data.onlineUsers || 0
                     });
                     setRecentActivity(data.data.recentActivity || []);
                 }
@@ -74,10 +76,20 @@ function AdminDashboard() {
         <div className="max-w-[1400px]">
             <div className="mb-8">
                 <h1 className="text-3xl font-bold mb-2 text-indigo-500">Admin Dashboard</h1>
-                <p className="text-gray-500 dark:text-gray-400">Overview of QuizHub platform metrics.</p>
+                <p className="text-gray-500 dark:text-gray-400">Overview of Medhashree platform metrics & security.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+                <div className="bg-white dark:bg-brand-surfaceAlt p-6 rounded-2xl shadow-sm border border-emerald-500/30">
+                    <div className="flex justify-between items-start mb-4">
+                        <div className="p-3 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-lg font-bold flex items-center gap-1">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse inline-block"></span> Online Now
+                        </div>
+                    </div>
+                    <div className="text-3xl font-bold mb-1 text-emerald-400">{stats.onlineUsers.toLocaleString()}</div>
+                    <div className="text-gray-500 text-sm">Active Concurrent Users</div>
+                </div>
+
                 <div className="bg-white dark:bg-brand-surfaceAlt p-6 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
                     <div className="flex justify-between items-start mb-4">
                         <div className="p-3 bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 rounded-lg">Users</div>
@@ -115,6 +127,14 @@ function AdminDashboard() {
                 <div className="lg:col-span-2 bg-white dark:bg-brand-surfaceAlt p-8 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800">
                     <h2 className="text-xl font-bold mb-6">Quick Actions</h2>
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                        <button
+                            onClick={() => navigate('/admin/activity-logs')}
+                            className="p-4 border border-indigo-500/40 bg-indigo-500/10 rounded-xl hover:bg-indigo-500/20 transition-colors flex flex-col items-center justify-center gap-2 text-center text-sm font-bold text-indigo-400 col-span-2 md:col-span-1"
+                        >
+                            <span className="text-2xl">📋</span>
+                            <span>Activity Logs & Alerts</span>
+                        </button>
+
                         <button
                             onClick={() => navigate('/admin/users')}
                             className="p-4 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-[#252e3f] transition-colors flex flex-col items-center justify-center gap-2 text-center text-sm font-medium"
