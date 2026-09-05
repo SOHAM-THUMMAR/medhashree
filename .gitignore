@@ -69,4 +69,8 @@ coverage/
 temp_node_install/
 __pycache__/
 *.pyc
+backend/data/
+*.db
+*.db-shm
+*.db-wal
 

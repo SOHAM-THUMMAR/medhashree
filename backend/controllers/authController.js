@@ -82,7 +82,7 @@ exports.checkEmail = async (req, res) => {
     // 3. Handle Admin Role -> Generate and send OTP automatically
     if (user.role === 'admin') {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 mins ISO format
 
       await db.query(
         'INSERT INTO password_resets (user_id, otp, expires_at) VALUES ($1, $2, $3)',
@@ -173,7 +173,7 @@ exports.login = async (req, res) => {
     // 4. Handle Admin 2FA OTP Login
     if (user.role === 'admin') {
       const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
 
       await db.query(
         'INSERT INTO password_resets (user_id, otp, expires_at) VALUES ($1, $2, $3)',
@@ -253,7 +253,7 @@ exports.verifyAdminOtp = async (req, res) => {
       return res.status(400).json({ success: false, error: 'Email and OTP are required' });
     }
 
-    const user = await UserModel.findByEmail(email);
+    const user = await UserModel.findByEmail(email.trim());
     if (!user || user.role !== 'admin') {
       return res.status(401).json({ success: false, error: 'Unauthorized admin access attempt' });
     }
@@ -264,18 +264,30 @@ exports.verifyAdminOtp = async (req, res) => {
 
     const otpResult = await db.query(
       `SELECT * FROM password_resets 
-       WHERE user_id = $1 AND otp = $2 AND is_used = FALSE AND expires_at > CURRENT_TIMESTAMP 
-       ORDER BY expires_at DESC LIMIT 1`,
+       WHERE user_id = $1 AND otp = $2 AND (is_used = FALSE OR is_used = 0) 
+       ORDER BY id DESC LIMIT 1`,
       [user.user_id, otp.trim()]
     );
 
     if (otpResult.rows.length === 0) {
       loggerService.logSecurity('ADMIN_OTP_FAILED', req, { email, otpAttempt: otp }, 401);
-      return res.status(401).json({ success: false, error: 'Invalid or expired OTP verification code' });
+      return res.status(401).json({ success: false, error: 'Invalid verification code' });
+    }
+
+    const record = otpResult.rows[0];
+
+    // Expiration check (cross-engine compatible PostgreSQL & SQLite)
+    const expiresAtMs = typeof record.expires_at === 'number'
+      ? record.expires_at
+      : new Date(record.expires_at).getTime();
+
+    if (isNaN(expiresAtMs) || expiresAtMs < Date.now()) {
+      loggerService.logSecurity('ADMIN_OTP_EXPIRED', req, { email, otpAttempt: otp }, 401);
+      return res.status(401).json({ success: false, error: 'Expired verification code. Please request a new OTP.' });
     }
 
     // Mark OTP as used
-    await db.query('UPDATE password_resets SET is_used = TRUE WHERE id = $1', [otpResult.rows[0].id]);
+    await db.query('UPDATE password_resets SET is_used = TRUE WHERE id = $1', [record.id]);
 
     const token = generateToken({ userId: user.user_id, role: user.role });
     delete user.password_hash;
@@ -301,11 +313,11 @@ exports.forgotPassword = async (req, res) => {
     const { email } = req.body;
     if (!email) return res.status(400).json({ success: false, error: 'Email is required' });
     
-    const user = await UserModel.findByEmail(email);
+    const user = await UserModel.findByEmail(email.trim());
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString(); // 10 mins ISO format
     
     await db.query(
       'INSERT INTO password_resets (user_id, otp, expires_at) VALUES ($1, $2, $3)',
@@ -359,17 +371,27 @@ exports.forgotPassword = async (req, res) => {
 exports.verifyOTP = async (req, res) => {
   try {
     const { email, otp } = req.body;
-    const user = await UserModel.findByEmail(email);
+    const user = await UserModel.findByEmail(email ? email.trim() : '');
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     
     const result = await db.query(
       `SELECT * FROM password_resets 
-       WHERE user_id = $1 AND otp = $2 AND is_used = false AND expires_at > NOW()`,
-      [user.user_id, otp]
+       WHERE user_id = $1 AND otp = $2 AND (is_used = FALSE OR is_used = 0)
+       ORDER BY id DESC LIMIT 1`,
+      [user.user_id, otp ? otp.trim() : '']
     );
     
     if (result.rows.length === 0) {
-      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+      return res.status(400).json({ success: false, error: 'Invalid verification code' });
+    }
+
+    const record = result.rows[0];
+    const expiresAtMs = typeof record.expires_at === 'number'
+      ? record.expires_at
+      : new Date(record.expires_at).getTime();
+
+    if (isNaN(expiresAtMs) || expiresAtMs < Date.now()) {
+      return res.status(400).json({ success: false, error: 'Expired verification code' });
     }
     
     res.status(200).json({ success: true, message: 'OTP verified successfully' });
@@ -383,27 +405,37 @@ exports.resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword } = req.body;
     
-    if (newPassword.length < 6) {
+    if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ success: false, error: 'Password must be at least 6 characters long' });
     }
     
-    const user = await UserModel.findByEmail(email);
+    const user = await UserModel.findByEmail(email ? email.trim() : '');
     if (!user) return res.status(404).json({ success: false, error: 'User not found' });
     
     const tokenResult = await db.query(
-      `SELECT id FROM password_resets 
-       WHERE user_id = $1 AND otp = $2 AND is_used = false AND expires_at > NOW()`,
-      [user.user_id, otp]
+      `SELECT * FROM password_resets 
+       WHERE user_id = $1 AND otp = $2 AND (is_used = FALSE OR is_used = 0)
+       ORDER BY id DESC LIMIT 1`,
+      [user.user_id, otp ? otp.trim() : '']
     );
     
     if (tokenResult.rows.length === 0) {
-      return res.status(400).json({ success: false, error: 'Invalid or expired OTP' });
+      return res.status(400).json({ success: false, error: 'Invalid verification code' });
+    }
+
+    const record = tokenResult.rows[0];
+    const expiresAtMs = typeof record.expires_at === 'number'
+      ? record.expires_at
+      : new Date(record.expires_at).getTime();
+
+    if (isNaN(expiresAtMs) || expiresAtMs < Date.now()) {
+      return res.status(400).json({ success: false, error: 'Expired verification code' });
     }
     
     const password_hash = await hashPassword(newPassword);
     
     await db.query('UPDATE users SET password_hash = $1 WHERE user_id = $2', [password_hash, user.user_id]);
-    await db.query('UPDATE password_resets SET is_used = true WHERE id = $1', [tokenResult.rows[0].id]);
+    await db.query('UPDATE password_resets SET is_used = TRUE WHERE id = $1', [record.id]);
     
     res.status(200).json({ success: true, message: 'Password reset successfully' });
   } catch (err) {

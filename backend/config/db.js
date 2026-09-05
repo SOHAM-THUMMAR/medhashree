@@ -400,6 +400,7 @@ function runSqliteQuery(sql, params = []) {
     
     // Clean PostgreSQL specific DDL if present
     convertedSql = convertedSql
+      .replace(/::JSONB/gi, '')
       .replace(/SERIAL PRIMARY KEY/gi, 'INTEGER PRIMARY KEY AUTOINCREMENT')
       .replace(/JSONB/gi, 'TEXT')
       .replace(/DECIMAL\(\d+,\d+\)/gi, 'REAL')
