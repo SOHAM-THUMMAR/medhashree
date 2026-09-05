@@ -56,6 +56,10 @@ function Login() {
         onError: handleGoogleError,
     });
 
+    const [requiresOtp, setRequiresOtp] = useState(false);
+    const [otpCode, setOtpCode] = useState("");
+    const [otpMessage, setOtpMessage] = useState("");
+
     const handleChange = (e) => {
         setFormData({
             ...formData,
@@ -78,6 +82,13 @@ function Login() {
             });
 
             const data = await response.json();
+
+            if (data.requiresOtp) {
+                setRequiresOtp(true);
+                setOtpMessage(data.message || "OTP verification code sent to admin email.");
+                setLoading(false);
+                return;
+            }
 
             if (data.success) {
                 // Save token to localStorage
@@ -102,6 +113,35 @@ function Login() {
         }
     };
 
+    const handleOtpSubmit = async (e) => {
+        e.preventDefault();
+        setError("");
+        setLoading(true);
+
+        try {
+            const response = await fetch(`${API_BASE}/auth/verify-admin-otp`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ email: formData.email, otp: otpCode })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                localStorage.setItem("token", data.data.token);
+                localStorage.setItem("user", JSON.stringify(data.data.user));
+                navigate("/admin");
+            } else {
+                setError(data.error || "Invalid OTP verification code");
+            }
+        } catch {
+            setError("Cannot connect to server for OTP verification");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
     return (
         <div>
             {/* Header */}
@@ -121,51 +161,95 @@ function Login() {
                 </div>
             )}
 
-            {/* Form */}
-            <form className="space-y-6" onSubmit={handleSubmit}>
-                <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
-                        Email Address
-                    </label>
-                    <input
-                        type="email"
-                        name="email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm font-light"
-                        placeholder="you@example.com"
-                    />
-                </div>
-
-                <div>
-                    <div className="flex justify-between items-center mb-2">
-                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">
-                            Password
-                        </label>
-                        <Link to="/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
-                            Forgot Password?
-                        </Link>
+            {/* Admin OTP Form */}
+            {requiresOtp ? (
+                <form className="space-y-6" onSubmit={handleOtpSubmit}>
+                    <div className="bg-indigo-500/10 border border-indigo-500/30 p-4 rounded-2xl text-center">
+                        <span className="text-2xl block mb-1">👑</span>
+                        <h3 className="text-sm font-bold text-indigo-300">Admin 2FA Security Required</h3>
+                        <p className="text-xs text-gray-300 mt-1">{otpMessage}</p>
                     </div>
-                    <input
-                        type="password"
-                        name="password"
-                        value={formData.password}
-                        onChange={handleChange}
-                        required
-                        className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm font-light"
-                        placeholder="••••••••"
-                    />
-                </div>
 
-                <button 
-                    type="submit" 
-                    disabled={loading}
-                    className="w-full bg-indigo-500 hover:bg-indigo-600 disabled:bg-indigo-500/40 disabled:text-white/60 text-white py-3.5 rounded-xl font-bold transition-all duration-300 shadow-md shadow-indigo-500/10 hover:shadow-indigo-500/30 hover:scale-[1.01]"
-                >
-                    {loading ? "Authorizing Entry..." : "Log In & Compete"}
-                </button>
-            </form>
+                    <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                            6-Digit Admin Verification OTP
+                        </label>
+                        <input
+                            type="text"
+                            maxLength={6}
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value)}
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-indigo-500/40 bg-indigo-950/40 text-center font-mono text-xl tracking-[8px] text-indigo-200 placeholder-gray-500 focus:outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/30 transition-all font-bold"
+                            placeholder="123456"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-[0.99] text-sm disabled:opacity-50"
+                    >
+                        {loading ? 'Verifying Admin OTP...' : '🔑 Verify & Access Admin Panel'}
+                    </button>
+
+                    <div className="text-center">
+                        <button
+                            type="button"
+                            onClick={() => { setRequiresOtp(false); setError(''); }}
+                            className="text-xs text-gray-400 hover:text-white transition"
+                        >
+                            ← Back to Login
+                        </button>
+                    </div>
+                </form>
+            ) : (
+                /* Standard Login Form */
+                <form className="space-y-6" onSubmit={handleSubmit}>
+                    <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">
+                            Email Address
+                        </label>
+                        <input
+                            type="email"
+                            name="email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm font-light"
+                            placeholder="you@example.com"
+                        />
+                    </div>
+
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <label className="block text-xs font-bold uppercase tracking-wider text-gray-400">
+                                Password
+                            </label>
+                            <Link to="/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300 font-semibold transition-colors">
+                                Forgot Password?
+                            </Link>
+                        </div>
+                        <input
+                            type="password"
+                            name="password"
+                            value={formData.password}
+                            onChange={handleChange}
+                            required
+                            className="w-full px-4 py-3 rounded-xl border border-white/10 bg-white/5 text-white placeholder-gray-500 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all text-sm font-light"
+                            placeholder="••••••••"
+                        />
+                    </div>
+
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-3.5 px-4 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white font-bold rounded-xl shadow-lg transition-all transform active:scale-[0.99] text-sm disabled:opacity-50"
+                    >
+                        {loading ? 'Entering...' : 'Enter Arena'}
+                    </button>
+                </form>
+            )}
 
             {/* Divider */}
             <div className="flex items-center my-8">

@@ -1,4 +1,5 @@
 const { Pool, Client } = require('pg');
+const bcrypt = require('bcryptjs');
 const env = require('./env');
 
 // Configure SSL dynamically:
@@ -466,6 +467,22 @@ const initialize = async () => {
     await pool.query('CREATE INDEX IF NOT EXISTS idx_activity_logs_action ON activity_logs(action)');
     console.log('Performance database indexes verified/created successfully.');
     console.log('Database migrations verified/executed successfully.');
+
+    // C4. Seed default owner/admin account if no admin exists
+    const adminEmail = env.ADMIN_EMAIL || 'admin@medhashree.com';
+    const adminCheck = await pool.query("SELECT * FROM users WHERE role = 'admin' OR email = $1", [adminEmail]);
+    if (adminCheck.rows.length === 0) {
+      const defaultPassword = process.env.INITIAL_ADMIN_PASSWORD || 'Admin@12345';
+      const salt = await bcrypt.genSalt(10);
+      const passwordHash = await bcrypt.hash(defaultPassword, salt);
+
+      await pool.query(
+        `INSERT INTO users (full_name, email, username, password_hash, role)
+         VALUES ($1, $2, $3, $4, 'admin')`,
+        ['System Owner', adminEmail, 'owner', passwordHash]
+      );
+      console.log(`[DB INIT] 👑 Default Owner Account created: ${adminEmail} (Role: admin)`);
+    }
 
     // D. Seed default site settings if they don't exist
     const defaults = {

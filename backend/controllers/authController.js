@@ -2,6 +2,9 @@ const UserModel = require('../models/userModel');
 const { hashPassword, comparePassword } = require('../utils/hashPassword');
 const { generateToken } = require('../utils/generateToken');
 const nodemailer = require('nodemailer');
+const db = require('../config/db');
+const env = require('../config/env');
+const loggerService = require('../services/loggerService');
 
 exports.register = async (req, res) => {
   try {
@@ -82,10 +85,61 @@ exports.login = async (req, res) => {
       return res.status(403).json({ success: false, error: 'Account is deactivated. Please contact support.' });
     }
 
-    // 4. Generate token
-    const token = generateToken({ userId: user.user_id, role: user.role });
+    // 4. Handle Admin 2FA OTP Login
+    if (user.role === 'admin') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
 
-    // Exclude password hash from response
+      await db.query(
+        'INSERT INTO password_resets (user_id, otp, expires_at) VALUES ($1, $2, $3)',
+        [user.user_id, otp, expiresAt]
+      );
+
+      let emailSent = false;
+      if (env.EMAIL_USER && env.EMAIL_PASS) {
+        try {
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: env.EMAIL_USER, pass: env.EMAIL_PASS }
+          });
+
+          await transporter.sendMail({
+            from: `"Medhashree Admin Control" <${env.EMAIL_USER}>`,
+            to: user.email,
+            subject: '👑 Your Medhashree Admin Login OTP',
+            html: `
+              <div style="font-family: Arial, sans-serif; padding: 25px; background: #0f172a; color: #f8fafc; border-radius: 12px; max-width: 500px; margin: 0 auto;">
+                <h2 style="color: #6366f1; margin-bottom: 5px;">Admin Login Verification</h2>
+                <p style="color: #94a3b8; font-size: 14px;">An admin login attempt was initiated for account: <strong>${user.email}</strong></p>
+                <div style="background: #1e293b; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;">
+                  <span style="font-size: 36px; font-weight: 800; letter-spacing: 6px; color: #38bdf8;">${otp}</span>
+                </div>
+                <p style="font-size: 12px; color: #64748b;">This OTP code expires in 10 minutes. If you did not attempt this login, contact system support immediately.</p>
+              </div>
+            `
+          });
+          emailSent = true;
+        } catch (mailErr) {
+          console.error('[Admin Login OTP Email Error]', mailErr.message);
+        }
+      }
+
+      console.log(`\n=================================\n👑 ADMIN LOGIN OTP DISPATCHED\nEmail: ${user.email}\nOTP Code: ${otp}\n=================================\n`);
+
+      loggerService.logSecurity('ADMIN_LOGIN_OTP_DISPATCHED', req, { email: user.email }, 200);
+
+      return res.status(200).json({
+        success: true,
+        requiresOtp: true,
+        email: user.email,
+        message: emailSent
+          ? 'Admin OTP sent to your registered email.'
+          : 'Admin OTP generated (Check server terminal console if SMTP is unconfigured).'
+      });
+    }
+
+    // 5. Regular User Token Generation
+    const token = generateToken({ userId: user.user_id, role: user.role });
     delete user.password_hash;
 
     res.status(200).json({
@@ -103,7 +157,59 @@ exports.login = async (req, res) => {
   }
 };
 
-const db = require('../config/db');
+/**
+ * Verify Admin Login 6-Digit OTP
+ */
+exports.verifyAdminOtp = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp) {
+      return res.status(400).json({ success: false, error: 'Email and OTP are required' });
+    }
+
+    const user = await UserModel.findByEmail(email);
+    if (!user || user.role !== 'admin') {
+      return res.status(401).json({ success: false, error: 'Unauthorized admin access attempt' });
+    }
+
+    if (!user.is_active) {
+      return res.status(403).json({ success: false, error: 'Account is deactivated' });
+    }
+
+    const otpResult = await db.query(
+      `SELECT * FROM password_resets 
+       WHERE user_id = $1 AND otp = $2 AND is_used = FALSE AND expires_at > CURRENT_TIMESTAMP 
+       ORDER BY expires_at DESC LIMIT 1`,
+      [user.user_id, otp.trim()]
+    );
+
+    if (otpResult.rows.length === 0) {
+      loggerService.logSecurity('ADMIN_OTP_FAILED', req, { email, otpAttempt: otp }, 401);
+      return res.status(401).json({ success: false, error: 'Invalid or expired OTP verification code' });
+    }
+
+    // Mark OTP as used
+    await db.query('UPDATE password_resets SET is_used = TRUE WHERE id = $1', [otpResult.rows[0].id]);
+
+    const token = generateToken({ userId: user.user_id, role: user.role });
+    delete user.password_hash;
+
+    loggerService.logInfo('ADMIN_LOGIN_SUCCESS', req, { userId: user.user_id, email: user.email });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Admin OTP verified successfully. Welcome back!',
+      data: {
+        user,
+        token
+      }
+    });
+  } catch (err) {
+    console.error('Verify Admin OTP Error:', err);
+    return res.status(500).json({ success: false, error: 'Failed to verify admin OTP' });
+  }
+};
 
 exports.forgotPassword = async (req, res) => {
   try {
