@@ -248,42 +248,42 @@ function ActivityLogs() {
       </div>
 
       {/* Top Metrics Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
         {/* Real-time Online Users Card */}
-        <div className="bg-slate-900/90 border border-emerald-500/30 p-5 rounded-2xl shadow-xl relative overflow-hidden">
+        <div className="bg-slate-900/90 border border-emerald-500/30 p-4 sm:p-5 rounded-2xl shadow-xl relative overflow-hidden">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-emerald-400 uppercase tracking-wider">Online Now</span>
-            <span className="flex h-3 w-3 relative">
+            <span className="text-[10px] sm:text-xs font-bold text-emerald-400 uppercase tracking-wider">Online Now</span>
+            <span className="flex h-2.5 w-2.5 sm:h-3 sm:w-3 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 sm:h-3 sm:w-3 bg-emerald-500"></span>
             </span>
           </div>
-          <div className="text-3xl font-extrabold text-emerald-300">{onlineUsers}</div>
-          <div className="text-xs text-gray-400 mt-1">Active users on platform</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-emerald-300">{onlineUsers}</div>
+          <div className="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Active users</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl">
-          <div className="text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Total Logs</div>
-          <div className="text-3xl font-extrabold text-slate-100">{stats.totalLogs.toLocaleString()}</div>
-          <div className="text-xs text-gray-400 mt-1">Recorded audit events</div>
+        <div className="bg-slate-900/90 border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-xl">
+          <div className="text-[10px] sm:text-xs font-bold text-indigo-400 uppercase tracking-wider mb-2">Total Logs</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-slate-100">{stats.totalLogs.toLocaleString()}</div>
+          <div className="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Audit events</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-slate-800 p-5 rounded-2xl shadow-xl">
-          <div className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Today's Logs</div>
-          <div className="text-3xl font-extrabold text-purple-300">{stats.todayLogs.toLocaleString()}</div>
-          <div className="text-xs text-gray-400 mt-1">Events logged today</div>
+        <div className="bg-slate-900/90 border border-slate-800 p-4 sm:p-5 rounded-2xl shadow-xl">
+          <div className="text-[10px] sm:text-xs font-bold text-purple-400 uppercase tracking-wider mb-2">Today's Logs</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-purple-300">{stats.todayLogs.toLocaleString()}</div>
+          <div className="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Logged today</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-red-500/20 p-5 rounded-2xl shadow-xl">
-          <div className="text-xs font-bold text-red-400 uppercase tracking-wider mb-2">Security Alerts</div>
-          <div className="text-3xl font-extrabold text-red-400">{stats.securityEvents}</div>
-          <div className="text-xs text-gray-400 mt-1">Auth & security triggers</div>
+        <div className="bg-slate-900/90 border border-red-500/20 p-4 sm:p-5 rounded-2xl shadow-xl">
+          <div className="text-[10px] sm:text-xs font-bold text-red-400 uppercase tracking-wider mb-2">Security Alerts</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-red-400">{stats.securityEvents}</div>
+          <div className="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Auth triggers</div>
         </div>
 
-        <div className="bg-slate-900/90 border border-rose-500/20 p-5 rounded-2xl shadow-xl">
-          <div className="text-xs font-bold text-rose-400 uppercase tracking-wider mb-2">Errors</div>
-          <div className="text-3xl font-extrabold text-rose-400">{stats.errorEvents}</div>
-          <div className="text-xs text-gray-400 mt-1">Exceptions caught</div>
+        <div className="bg-slate-900/90 border border-rose-500/20 p-4 sm:p-5 rounded-2xl shadow-xl col-span-2 sm:col-span-1">
+          <div className="text-[10px] sm:text-xs font-bold text-rose-400 uppercase tracking-wider mb-2">Errors</div>
+          <div className="text-2xl sm:text-3xl font-extrabold text-rose-400">{stats.errorEvents}</div>
+          <div className="text-[10px] sm:text-xs text-gray-400 mt-1 truncate">Exceptions caught</div>
         </div>
       </div>
 
@@ -303,14 +303,14 @@ function ActivityLogs() {
       />
 
       {/* Logs Filters Toolbar */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-4 mb-6 shadow-xl space-y-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+      <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-3.5 sm:p-4 mb-6 shadow-xl space-y-3 sm:space-y-4">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="grid grid-cols-1 sm:flex sm:flex-wrap items-center gap-2.5 sm:gap-3 w-full lg:w-auto">
             {/* Search Box */}
-            <div className="relative w-full sm:w-72">
+            <div className="relative w-full sm:w-64 md:w-72">
               <input
                 type="text"
-                placeholder="Search email, user, IP, action, details..."
+                placeholder="Search email, user, IP, action..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                 className="w-full bg-slate-800 border border-slate-700 text-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-indigo-500 placeholder-slate-500"
@@ -322,7 +322,7 @@ function ActivityLogs() {
             <select
               value={severityFilter}
               onChange={(e) => { setSeverityFilter(e.target.value); setPage(1); }}
-              className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+              className="w-full sm:w-auto bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
             >
               <option value="all">All Severities</option>
               <option value="info">Info</option>
@@ -335,7 +335,7 @@ function ActivityLogs() {
             <select
               value={actionFilter}
               onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-              className="bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
+              className="w-full sm:w-auto bg-slate-800 border border-slate-700 text-slate-200 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-indigo-500 font-medium"
             >
               <option value="">All Action Types</option>
               <option value="SYSTEM_RESOURCE_METRICS">🖥️ System Resource Metrics</option>
@@ -348,7 +348,7 @@ function ActivityLogs() {
 
           {/* Date Wise Filters */}
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-            <div className="flex items-center gap-1 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1.5 rounded-xl">
+            <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-1 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1.5 rounded-xl">
               <span className="text-[11px] text-slate-400 font-semibold uppercase">From:</span>
               <input
                 type="date"
@@ -358,7 +358,7 @@ function ActivityLogs() {
               />
             </div>
 
-            <div className="flex items-center gap-1 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1.5 rounded-xl">
+            <div className="flex-1 sm:flex-initial flex items-center justify-between sm:justify-start gap-1 bg-slate-800/80 border border-slate-700/80 px-2.5 py-1.5 rounded-xl">
               <span className="text-[11px] text-slate-400 font-semibold uppercase">To:</span>
               <input
                 type="date"
@@ -378,7 +378,7 @@ function ActivityLogs() {
                   setEndDate('');
                   setPage(1);
                 }}
-                className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
+                className="w-full sm:w-auto px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition"
               >
                 Clear Filters ✕
               </button>
@@ -386,7 +386,7 @@ function ActivityLogs() {
           </div>
         </div>
 
-        <div className="text-xs text-slate-400 text-right border-t border-slate-800/60 pt-2">
+        <div className="text-[11px] sm:text-xs text-slate-400 text-right border-t border-slate-800/60 pt-2">
           Showing <span className="font-bold text-indigo-400">{logs.length}</span> of <span className="font-bold text-white">{totalLogs}</span> activity log records
         </div>
       </div>
