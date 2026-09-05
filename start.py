@@ -104,12 +104,12 @@ def verify_and_start_all(root_dir: Path, env_vars: dict, domain: str = None):
         print(f" {Colors.BOLD}⚙️  Backend API Endpoint:{Colors.ENDC}   http://localhost/api")
         print(f" {Colors.BOLD}📊 Resource Monitor:{Colors.ENDC}       http://127.0.0.1:{monitor_port}/metrics")
     else:
-        print(f" {Colors.BOLD}🌐 Localhost Website App:{Colors.ENDC}   http://localhost:{port}")
-        print(f" {Colors.BOLD}⚡ Vite Live Dev Server:{Colors.ENDC}    http://localhost:5173")
+        print(f" {Colors.BOLD}🌐 Main Website App:{Colors.ENDC}        http://localhost:{port} (Built React App + API)")
+        print(f" {Colors.BOLD}⚡ Vite Live Dev Server:{Colors.ENDC}    http://localhost:5173 (Requires 'pnpm dev' in frontend folder)")
         print(f" {Colors.BOLD}⚙️  Backend REST API:{Colors.ENDC}       http://localhost:{port}/api")
         print(f" {Colors.BOLD}📊 Resource Monitor:{Colors.ENDC}       http://127.0.0.1:{monitor_port}/metrics")
-        print(f"\n {Colors.BOLD}👉 Command to start website server:{Colors.ENDC} node backend/server.js")
-        print(f" {Colors.BOLD}👉 Command to auto-run setup & launch:{Colors.ENDC} python start.py --run")
+        print(f"\n {Colors.BOLD}👉 Command to start website server:{Colors.ENDC} node backend/server.js (or python start.py --run)")
+        print(f" {Colors.BOLD}👉 Command for Vite live hot-reload:{Colors.ENDC} cd frontend && pnpm dev")
 
     print(f"{Colors.BOLD}{Colors.OKGREEN}─────────────────────────────────────────────────────────────────────────────{Colors.ENDC}\n")
 
@@ -158,8 +158,8 @@ def main():
     if args.run:
         log_header("Launching Medhashree Website Server")
         server_script = (ROOT_DIR / 'backend' / 'server.js').as_posix()
-        log_info(f"Starting Node.js server: node {server_script}")
-        subprocess.run(f"node {server_script}", shell=True)
+        log_info(f'Starting Node.js server: node "{server_script}"')
+        subprocess.run(f'node "{server_script}"', shell=True)
 
 if __name__ == '__main__':
     main()
