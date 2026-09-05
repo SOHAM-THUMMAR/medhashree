@@ -66,8 +66,10 @@ const SECRET_RULES = [
 ];
 
 // Files and folders to exclude
-const EXCLUDE_DIRS = ['node_modules', 'dist', '.git', '.wrangler', 'uploads'];
-const EXCLUDE_FILES = ['package-lock.json', 'security-check.js', 'seo-check.js'];
+const EXCLUDE_DIRS = ['node_modules', 'dist', '.git', '.wrangler', 'uploads', 'temp_node_install', '__pycache__'];
+const EXCLUDE_FILES = ['package-lock.json', 'security-check.js', 'seo-check.js', '.env.example'];
+const EXCLUDE_EXTENSIONS = ['.exe', '.zip', '.png', '.jpg', '.jpeg', '.gif', '.ico', '.ttf', '.woff', '.woff2', '.eot', '.pdf', '.pyc'];
+
 
 // Exceptions list (hardcoded strings in test files or documentation)
 const EXCEPTIONS = [
@@ -103,10 +105,12 @@ function logError(message) {
 function scanFile(filePath) {
   const relativePath = path.relative(path.join(__dirname, '..'), filePath);
   
-  // Skip exceptions/test files or build dependencies
-  if (EXCEPTIONS.some(exc => relativePath.endsWith(exc))) {
+  // Skip exceptions/test files or binary extensions
+  const ext = path.extname(filePath).toLowerCase();
+  if (EXCLUDE_EXTENSIONS.includes(ext) || EXCEPTIONS.some(exc => relativePath.endsWith(exc))) {
     return;
   }
+
 
   const content = fs.readFileSync(filePath, 'utf8');
   const lines = content.split('\n');
