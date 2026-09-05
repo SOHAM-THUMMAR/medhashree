@@ -3,6 +3,7 @@ import { authFetch } from '../../config/api';
 import ResourceMonitorCard from '../../components/admin/ResourceMonitorCard';
 import AlertSettingsForm from '../../components/admin/AlertSettingsForm';
 import LogInspectorModal from '../../components/admin/LogInspectorModal';
+import AdminNavBanner from '../../components/admin/AdminNavBanner';
 
 function ActivityLogs() {
   const [logs, setLogs] = useState([]);
@@ -219,33 +220,28 @@ function ActivityLogs() {
   };
 
   return (
-    <div className="max-w-[1400px] mx-auto p-4 md:p-6 text-gray-100">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400">
-            System & User Activity Logs
-          </h1>
-          <p className="text-gray-400 text-sm mt-1">
-            Real-time audit trail of platform events, security triggers, and high-traffic alerts.
-          </p>
-        </div>
+    <div className="min-h-screen bg-[#090d16] text-white p-4 lg:p-8 font-sans">
+      <div className="max-w-[1320px] mx-auto space-y-8">
+        {/* Unified Admin Navigation Banner */}
+        <AdminNavBanner 
+          title="System & User Activity Audit Logs" 
+          subtitle="Real-time audit trail of platform events, user activity, security triggers, and export tools" 
+        />
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-end gap-3 -mt-4">
           <button
             onClick={() => handleExport('csv')}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl shadow-lg transition text-sm flex items-center gap-2"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-xl shadow-lg transition text-xs flex items-center gap-2"
           >
             📥 Export CSV
           </button>
           <button
             onClick={() => handleExport('json')}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-medium rounded-xl shadow-lg transition text-sm flex items-center gap-2"
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-semibold rounded-xl shadow-lg transition text-xs flex items-center gap-2"
           >
             📄 Export JSON
           </button>
         </div>
-      </div>
 
       {/* Top Metrics Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 mb-6 sm:mb-8">
@@ -496,14 +492,14 @@ function ActivityLogs() {
         )}
       </div>
 
-      {/* Modular Inspector Log Modal Component */}
       <LogInspectorModal
         selectedLog={selectedLog}
         setSelectedLog={setSelectedLog}
         getSeverityBadge={getSeverityBadge}
       />
     </div>
-  );
+  </div>
+);
 }
 
 export default ActivityLogs;

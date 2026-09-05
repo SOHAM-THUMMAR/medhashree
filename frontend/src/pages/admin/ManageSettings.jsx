@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authFetch } from '../../config/api';
 import AuthMarketingPane from '../../components/AuthMarketingPane';
+import AdminNavBanner from '../../components/admin/AdminNavBanner';
 
 function ManageSettings() {
     const navigate = useNavigate();
@@ -60,7 +61,7 @@ function ManageSettings() {
         landing_tournament_2_name: 'JavaScript Champions Cup',
         landing_tournament_2_difficulty: 'Advanced',
         landing_tournament_2_questions: '3',
-        landing_tournament_2_desc: 'Crack core concepts including the Javascript Event Loop,WeakMap collections, memory optimizations, and async schedules.',
+        landing_tournament_2_desc: 'Crack core concepts including the Javascript Event Loop, WeakMap collections, memory optimizations, and async schedules.',
 
         // Tournament Card 3
         landing_tournament_3_icon: '🗄️',
@@ -180,17 +181,10 @@ function ManageSettings() {
     return (
         <div className="max-w-[1400px] mx-auto text-black dark:text-white pb-12 pt-6 px-4 lg:px-0">
             {/* Header Banner */}
-            <div className="w-full bg-gradient-to-r from-indigo-500/90 via-primary-darker to-brand-dark/50 dark:to-[#090e17] rounded-2xl py-12 px-10 mb-10 shadow-lg relative overflow-hidden">
-                <h1 className="font-bold text-3xl md:text-[34px] text-white mb-8 tracking-wide relative z-10">Manage Site Information & Content</h1>
-                <div className="flex flex-wrap gap-4 relative z-10">
-                    <button onClick={() => navigate('/admin/users')} className="px-6 py-1.5 rounded-full border-2 border-white text-white font-semibold text-sm hover:bg-white/10 transition">manage users</button>
-                    <button onClick={() => navigate('/admin/content')} className="px-6 py-1.5 rounded-full border-2 border-white text-white font-semibold text-sm hover:bg-white/10 transition">manage Q's</button>
-                    <button onClick={() => navigate('/admin/self-study')} className="px-6 py-1.5 rounded-full border-2 border-white text-white font-semibold text-sm hover:bg-white/10 transition">manage self study</button>
-                    <button onClick={() => navigate('/admin/tournaments')} className="px-6 py-1.5 rounded-full border-2 border-white text-white font-semibold text-sm hover:bg-white/10 transition">manage tournaments</button>
-                    <button onClick={() => navigate('/admin/settings')} className="px-6 py-1.5 rounded-full border-2 border-primary-light bg-indigo-500 text-white font-semibold text-sm shadow-md">site settings</button>
-                </div>
-                <div className="absolute top-0 right-0 w-[400px] h-[400px] bg-indigo-500/20 rounded-full blur-[100px] -translate-y-1/2 translate-x-1/3"></div>
-            </div>
+            <AdminNavBanner 
+                title="Manage Site Information & Content" 
+                subtitle="Configure global landing page messaging, brand identity, and authentication portal copy." 
+            />
 
             {/* Success/Error Banners */}
             {message.text && (
