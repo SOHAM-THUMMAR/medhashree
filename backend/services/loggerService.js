@@ -10,6 +10,8 @@ class LoggerService {
     this.logs = [];
     this.nextLogId = 1;
     this.flushTimer = null;
+    this.userCache = new Map();
+    this.userCacheLastLoaded = 0;
     this._initStore();
   }
 
@@ -60,6 +62,80 @@ class LoggerService {
   }
 
   /**
+   * Load user cache from DB (Cached for 60s)
+   */
+  async _loadUserCache() {
+    if (Date.now() - this.userCacheLastLoaded < 60000 && this.userCache.size > 0) {
+      return;
+    }
+    try {
+      const db = require('../config/db');
+      await db.dbInitPromise;
+      const res = await db.query('SELECT user_id, email, username FROM users');
+      if (res && res.rows) {
+        this.userCache.clear();
+        for (const u of res.rows) {
+          this.userCache.set(u.user_id, u);
+          this.userCache.set(String(u.user_id), u);
+          if (u.username) {
+            this.userCache.set(u.username, u);
+            this.userCache.set(String(u.username).toLowerCase(), u);
+          }
+          if (u.email) {
+            this.userCache.set(u.email, u);
+            this.userCache.set(String(u.email).toLowerCase(), u);
+          }
+        }
+        this.userCacheLastLoaded = Date.now();
+      }
+    } catch (e) {
+      // Non-blocking if DB is initializing
+    }
+  }
+
+  /**
+   * Automatically enrich all logs with user email addresses & handles
+   */
+  async _enrichLogs() {
+    await this._loadUserCache();
+    let modified = false;
+
+    for (const log of this.logs) {
+      // 1. Enrich by user_id
+      if (log.user_id != null && (this.userCache.has(log.user_id) || this.userCache.has(String(log.user_id)))) {
+        const u = this.userCache.get(log.user_id) || this.userCache.get(String(log.user_id));
+        if (!log.email && u.email) {
+          log.email = u.email;
+          modified = true;
+        }
+        if ((!log.username || log.username === `user_${log.user_id}`) && u.username) {
+          log.username = u.username;
+          modified = true;
+        }
+      }
+
+      // 2. Enrich by username
+      if (!log.email && log.username && (this.userCache.has(log.username) || this.userCache.has(String(log.username).toLowerCase()))) {
+        const u = this.userCache.get(log.username) || this.userCache.get(String(log.username).toLowerCase());
+        if (u && u.email) {
+          log.email = u.email;
+          modified = true;
+        }
+      }
+
+      // 3. Enrich by details.email
+      if (!log.email && log.details && typeof log.details === 'object' && log.details.email) {
+        log.email = log.details.email;
+        modified = true;
+      }
+    }
+
+    if (modified) {
+      this._scheduleFlush();
+    }
+  }
+
+  /**
    * Log an activity entry into JSON store
    */
   async log({
@@ -79,16 +155,31 @@ class LoggerService {
     try {
       if (!action) return;
 
+      if (this.userCache.size === 0) {
+        await this._loadUserCache();
+      }
+
       const formattedDetails = details 
         ? (typeof details === 'object' ? details : { info: String(details) })
         : null;
 
-      const userEmail = email || details?.email || (typeof details === 'object' && details?.email) || null;
+      let userEmail = email || details?.email || (typeof details === 'object' && details?.email) || null;
+
+      if (!userEmail && userId != null && (this.userCache.has(userId) || this.userCache.has(String(userId)))) {
+        const u = this.userCache.get(userId) || this.userCache.get(String(userId));
+        userEmail = u.email;
+      }
+
+      let userHandle = username;
+      if (!userHandle && userId != null && (this.userCache.has(userId) || this.userCache.has(String(userId)))) {
+        const u = this.userCache.get(userId) || this.userCache.get(String(userId));
+        userHandle = u.username;
+      }
 
       const newLog = {
         log_id: this.nextLogId++,
         user_id: userId,
-        username: username || (userId ? `user_${userId}` : 'guest'),
+        username: userHandle || (userId ? `user_${userId}` : 'guest'),
         email: userEmail,
         role: role || 'guest',
         action,
@@ -188,6 +279,7 @@ class LoggerService {
    */
   async getLogs({ page = 1, limit = 50, severity, action, search, startDate, endDate }) {
     try {
+      await this._enrichLogs();
       let filtered = [...this.logs];
 
       // Severity filter
@@ -248,6 +340,7 @@ class LoggerService {
    */
   async getStats() {
     try {
+      await this._enrichLogs();
       const todayStr = new Date().toISOString().split('T')[0];
 
       let todayCount = 0;
