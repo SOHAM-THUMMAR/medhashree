@@ -26,18 +26,47 @@ class AlertEmailService {
   }
 
   /**
-   * Resolve recipient admin email from DB settings or env
+   * Resolve recipient admin emails from DB (fetches ALL active admins) or env fallbacks
    */
-  async getRecipientEmail() {
+  async getRecipientEmails() {
     try {
-      const res = await db.query("SELECT value FROM site_settings WHERE key = 'alert_email'");
-      if (res.rows.length > 0 && res.rows[0].value) {
-        return res.rows[0].value;
+      await db.dbInitPromise;
+      const res = await db.query("SELECT email FROM users WHERE role = 'admin' AND email IS NOT NULL AND is_active = TRUE");
+      if (res && res.rows && res.rows.length > 0) {
+        const emails = Array.from(new Set(res.rows.map(r => r.email.trim()).filter(Boolean)));
+        if (emails.length > 0) {
+          // Join by comma so Nodemailer sends to all admin email addresses simultaneously
+          return emails.join(', ');
+        }
+      }
+    } catch (e) {
+      // Non-blocking fallback if DB initializing
+    }
+
+    // Fallback: check custom alert_email setting
+    try {
+      const resSetting = await db.query("SELECT value FROM site_settings WHERE key = 'alert_email'");
+      if (resSetting.rows.length > 0 && resSetting.rows[0].value) {
+        return resSetting.rows[0].value;
       }
     } catch (e) {
       // Fallback
     }
-    return env.ADMIN_EMAIL || env.EMAIL_USER || 'admin@medhashree.com';
+
+    // Default admin emails list fallback
+    const defaultAdmins = Array.from(new Set([
+      'sohamthummar04@gmail.com',
+      'sohamthummae04@gmail.com',
+      env.ADMIN_EMAIL,
+      env.EMAIL_USER
+    ].filter(Boolean))).join(', ');
+
+    return defaultAdmins || 'admin@medhashree.com';
+  }
+
+  // Alias for backward compatibility
+  async getRecipientEmail() {
+    return this.getRecipientEmails();
   }
 
   /**
@@ -105,8 +134,8 @@ class AlertEmailService {
     // Mark as sent before sending to prevent duplicate triggers
     this.lastThresholdAlertSent.set(triggeredThreshold, now);
 
-    const recipient = await this.getRecipientEmail();
-    await this.sendHighTrafficAlert(recipient, currentOnlineCount, triggeredThreshold);
+    const recipients = await this.getRecipientEmails();
+    await this.sendHighTrafficAlert(recipients, currentOnlineCount, triggeredThreshold);
   }
 
   /**

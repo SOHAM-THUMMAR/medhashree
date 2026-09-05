@@ -2,13 +2,13 @@ const alertEmailService = require('../../services/alertEmailService');
 const db = require('../../config/db');
 const { success, error } = require('../../utils/apiResponse');
 
-// @desc    Send test alert email to specified or admin email
+// @desc    Send test alert email to specified or all admin emails
 // @route   POST /api/admin/alerts/test
 // @access  Admin
 exports.sendTestAlertEmail = async (req, res) => {
   try {
     const { targetEmail } = req.body;
-    const recipient = targetEmail || await alertEmailService.getRecipientEmail();
+    const recipient = targetEmail || await alertEmailService.getRecipientEmails();
 
     await alertEmailService.sendTestEmail(recipient);
     return success(res, { recipient }, `Test alert email sent to ${recipient}`);
@@ -24,7 +24,7 @@ exports.sendTestAlertEmail = async (req, res) => {
 exports.getAlertConfig = async (req, res) => {
   try {
     const config = await alertEmailService.getThresholdConfig();
-    const recipientEmail = await alertEmailService.getRecipientEmail();
+    const recipientEmail = await alertEmailService.getRecipientEmails();
     return success(res, { ...config, recipientEmail }, 'Alert configuration fetched');
   } catch (err) {
     console.error('Get Alert Config Error:', err);
