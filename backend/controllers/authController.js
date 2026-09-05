@@ -60,6 +60,91 @@ exports.register = async (req, res) => {
   }
 };
 
+exports.checkEmail = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ success: false, error: 'Email address is required' });
+    }
+
+    // 1. Find user by email
+    const user = await UserModel.findByEmail(email.trim());
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User with this email does not exist' });
+    }
+
+    // 2. Check if user is active
+    if (!user.is_active) {
+      return res.status(403).json({ success: false, error: 'Account is deactivated. Please contact support.' });
+    }
+
+    // 3. Handle Admin Role -> Generate and send OTP automatically
+    if (user.role === 'admin') {
+      const otp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+      await db.query(
+        'INSERT INTO password_resets (user_id, otp, expires_at) VALUES ($1, $2, $3)',
+        [user.user_id, otp, expiresAt]
+      );
+
+      let emailSent = false;
+      if (env.EMAIL_USER && env.EMAIL_PASS) {
+        try {
+          const transporter = nodemailer.createTransport({
+            service: 'gmail',
+            auth: { user: env.EMAIL_USER, pass: env.EMAIL_PASS }
+          });
+
+          await transporter.sendMail({
+            from: `"Medhashree Admin Control" <${env.EMAIL_USER}>`,
+            to: user.email,
+            subject: '👑 Your Medhashree Admin Login OTP',
+            html: `
+              <div style="font-family: Arial, sans-serif; padding: 25px; background: #0f172a; color: #f8fafc; border-radius: 12px; max-width: 500px; margin: 0 auto;">
+                <h2 style="color: #6366f1; margin-bottom: 5px;">Admin Login Verification</h2>
+                <p style="color: #94a3b8; font-size: 14px;">An admin login attempt was initiated for account: <strong>${user.email}</strong></p>
+                <div style="background: #1e293b; padding: 20px; border-radius: 10px; text-align: center; margin: 20px 0;">
+                  <span style="font-size: 36px; font-weight: 800; letter-spacing: 6px; color: #38bdf8;">${otp}</span>
+                </div>
+                <p style="font-size: 12px; color: #64748b;">This OTP code expires in 10 minutes. If you did not attempt this login, contact system support immediately.</p>
+              </div>
+            `
+          });
+          emailSent = true;
+        } catch (mailErr) {
+          console.error('[Admin Login OTP Email Error]', mailErr.message);
+        }
+      }
+
+      console.log(`\n=================================\n👑 ADMIN LOGIN OTP DISPATCHED\nEmail: ${user.email}\nOTP Code: ${otp}\n=================================\n`);
+
+      loggerService.logSecurity('ADMIN_LOGIN_OTP_DISPATCHED', req, { email: user.email }, 200);
+
+      return res.status(200).json({
+        success: true,
+        isAdmin: true,
+        email: user.email,
+        message: emailSent
+          ? 'Admin OTP sent to your registered email.'
+          : 'Admin OTP generated (Check server terminal console if SMTP is unconfigured).'
+      });
+    }
+
+    // 4. Non-admin user -> Require password next
+    return res.status(200).json({
+      success: true,
+      isAdmin: false,
+      email: user.email
+    });
+
+  } catch (err) {
+    console.error('Check Email Error:', err);
+    res.status(500).json({ success: false, error: 'Server error checking email' });
+  }
+};
+
 exports.login = async (req, res) => {
   try {
     const { email, password } = req.body;

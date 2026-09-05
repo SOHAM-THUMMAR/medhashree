@@ -3,6 +3,7 @@ const router = express.Router();
 const authController = require('../controllers/authController');
 
 // Define auth routes
+router.post('/check-email', authController.checkEmail);
 router.post('/register', authController.register);
 router.post('/login', authController.login);
 router.post('/verify-admin-otp', authController.verifyAdminOtp);
