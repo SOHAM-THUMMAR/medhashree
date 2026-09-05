@@ -33,6 +33,7 @@ const env = {
 
   // Resource & System Monitoring settings
   ENABLE_RESOURCE_MONITORING: process.env.ENABLE_RESOURCE_MONITORING !== 'false',
+  PYTHON_MONITOR_URL: process.env.PYTHON_MONITOR_URL || 'http://127.0.0.1:5001/metrics',
   RESOURCE_MONITOR_INTERVAL_SEC: parseInt(process.env.RESOURCE_MONITOR_INTERVAL_SEC || '10', 10),
   CPU_WARN_THRESHOLD: parseInt(process.env.CPU_WARN_THRESHOLD || '85', 10),
   MEMORY_WARN_THRESHOLD: parseInt(process.env.MEMORY_WARN_THRESHOLD || '90', 10)

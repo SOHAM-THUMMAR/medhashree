@@ -147,7 +147,9 @@ def install_system_dependencies():
 
     log_info("Updating apt package lists...")
     run_cmd("apt-get update -y")
-    run_cmd("apt-get install -y curl git build-essential ufw python3-pip software-properties-common certbot python3-certbot-nginx postgresql postgresql-contrib nginx")
+    log_info("Installing system packages & python3-psutil...")
+    run_cmd("apt-get install -y curl git build-essential ufw python3-pip python3-psutil software-properties-common certbot python3-certbot-nginx postgresql postgresql-contrib nginx")
+    run_cmd("pip3 install psutil", check=False)
 
     # Check Node.js version
     node_installed = shutil.which('node') is not None
@@ -205,7 +207,7 @@ def setup_postgresql(env_vars):
     log_success("PostgreSQL user and database configured.")
 
 def build_backend_and_start_pm2(root_dir, env_vars):
-    """Install backend npm dependencies, run schema init, start PM2 daemon"""
+    """Install backend npm dependencies, run schema init, start PM2 daemons (Backend + Python Monitor)"""
     log_header("3/5 Setting Up Backend Application & PM2")
 
     backend_dir = root_dir / 'backend'
@@ -220,36 +222,51 @@ def build_backend_and_start_pm2(root_dir, env_vars):
     log_info("Running database migrations & schema initialization...")
     run_cmd("node -e \"require('./config/db.js')\"", cwd=backend_dir, check=False)
 
-    # Create PM2 ecosystem config
+    # Create PM2 ecosystem config (includes Node Backend and Python Monitor Daemon)
     ecosystem_path = backend_dir / 'ecosystem.config.js'
     port = env_vars.get('PORT', '5000')
+    monitor_port = env_vars.get('MONITOR_PORT', '5001')
+    monitor_path = (root_dir / 'monitor.py').as_posix()
 
     ecosystem_content = f"""module.exports = {{
-  apps: [{{
-    name: 'medhashree-backend',
-    script: 'server.js',
-    cwd: '{backend_dir.as_posix()}',
-    instances: 1,
-    autorestart: true,
-    watch: false,
-    max_memory_restart: '1G',
-    env: {{
-      NODE_ENV: 'production',
-      PORT: {port}
+  apps: [
+    {{
+      name: 'medhashree-backend',
+      script: 'server.js',
+      cwd: '{backend_dir.as_posix()}',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      env: {{
+        NODE_ENV: 'production',
+        PORT: {port}
+      }}
+    }},
+    {{
+      name: 'medhashree-monitor',
+      script: '{monitor_path}',
+      interpreter: 'python3',
+      cwd: '{root_dir.as_posix()}',
+      autorestart: true,
+      watch: false,
+      env: {{
+        MONITOR_PORT: {monitor_port}
+      }}
     }}
-  }}]
+  ]
 }};
 """
     ecosystem_path.write_text(ecosystem_content, encoding='utf-8')
     log_info("Created PM2 ecosystem configuration.")
 
-    # Start backend with PM2
+    # Start backend & Python monitor daemon with PM2
     if shutil.which('pm2'):
-        log_info("Starting/Restarting backend with PM2...")
+        log_info("Starting/Restarting backend & Python monitor with PM2...")
         run_cmd(f"pm2 startOrRestart ecosystem.config.js --env production", cwd=backend_dir)
         run_cmd("pm2 save", check=False)
 
-    log_success("Backend application initialized and running on PM2.")
+    log_success("Backend application and Python resource monitor running under PM2 daemon.")
 
 def build_frontend(root_dir):
     """Install frontend dependencies & compile React Vite production bundle"""

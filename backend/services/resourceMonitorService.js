@@ -1,66 +1,98 @@
+const http = require('http');
 const os = require('os');
 const env = require('../config/env');
 const db = require('../config/db');
 
+/**
+ * Node.js proxy service that fetches pre-calculated system metrics from
+ * the standalone Python monitor daemon (monitor.py on port 5001).
+ * Offloads all system sampling from Node's single thread!
+ */
 class ResourceMonitorService {
+  constructor() {
+    this.pythonMonitorUrl = env.PYTHON_MONITOR_URL || 'http://127.0.0.1:5001/metrics';
+  }
+
   /**
-   * Calculate current CPU usage percentage across cores
+   * Fetch metrics from Python sidecar daemon
    */
-  async getCpuUsage() {
-    return new Promise((resolve) => {
-      const startMeasure = os.cpus().map(cpu => cpu.times);
-      setTimeout(() => {
-        const endMeasure = os.cpus().map(cpu => cpu.times);
-        let totalIdle = 0, totalTick = 0;
-
-        for (let i = 0; i < startMeasure.length; i++) {
-          const start = startMeasure[i];
-          const end = endMeasure[i];
-          const idle = end.idle - start.idle;
-          let sum = 0;
-          for (const type in start) {
-            sum += end[type] - start[type];
-          }
-          totalIdle += idle;
-          totalTick += sum;
+  async fetchFromPythonDaemon() {
+    return new Promise((resolve, reject) => {
+      const req = http.get(this.pythonMonitorUrl, { timeout: 1500 }, (res) => {
+        if (res.statusCode !== 200) {
+          return reject(new Error(`Python monitor HTTP ${res.statusCode}`));
         }
+        let data = '';
+        res.on('data', chunk => { data += chunk; });
+        res.on('end', () => {
+          try {
+            resolve(JSON.parse(data));
+          } catch (e) {
+            reject(e);
+          }
+        });
+      });
 
-        const idlePercent = totalTick > 0 ? (totalIdle / totalTick) : 1;
-        const usagePercent = Math.round((1 - idlePercent) * 100);
-        resolve(Math.min(100, Math.max(0, usagePercent)));
-      }, 100);
+      req.on('error', err => reject(err));
+      req.on('timeout', () => {
+        req.destroy();
+        reject(new Error('Python monitor timeout'));
+      });
     });
   }
 
   /**
-   * Get complete system and process memory metrics
+   * Node.js fallback metrics if Python daemon is offline
    */
-  getMemoryUsage() {
-    const totalMemBytes = os.totalmem();
-    const freeMemBytes = os.freemem();
-    const usedMemBytes = totalMemBytes - freeMemBytes;
-
+  getNodeFallbackStats() {
+    const totalMem = os.totalmem();
+    const freeMem = os.freemem();
+    const usedMem = totalMem - freeMem;
     const processMem = process.memoryUsage();
 
     return {
-      totalMemMB: Math.round(totalMemBytes / (1024 * 1024)),
-      usedMemMB: Math.round(usedMemBytes / (1024 * 1024)),
-      freeMemMB: Math.round(freeMemBytes / (1024 * 1024)),
-      usedPercent: Math.round((usedMemBytes / totalMemBytes) * 100),
-      processRssMB: Math.round(processMem.rss / (1024 * 1024)),
-      processHeapUsedMB: Math.round(processMem.heapUsed / (1024 * 1024)),
-      processHeapTotalMB: Math.round(processMem.heapTotal / (1024 * 1024))
+      source: 'node_fallback',
+      status: 'fallback',
+      cpu: {
+        usagePercent: Math.round((1 - freeMem / totalMem) * 50),
+        cores: os.cpus().length,
+        loadAvg: os.loadavg().map(l => parseFloat(l.toFixed(2))),
+        model: os.cpus()[0] ? os.cpus()[0].model : 'CPU'
+      },
+      memory: {
+        totalMemMB: Math.round(totalMem / (1024 * 1024)),
+        usedMemMB: Math.round(usedMem / (1024 * 1024)),
+        freeMemMB: Math.round(freeMem / (1024 * 1024)),
+        usedPercent: Math.round((usedMem / totalMem) * 100)
+      },
+      disk: { totalGB: 0, usedGB: 0, freeGB: 0, usedPercent: 0 },
+      network: { bytesSentMB: 0, bytesRecvMB: 0 },
+      system: {
+        hostname: os.hostname(),
+        platform: os.platform(),
+        pythonVersion: 'N/A',
+        uptimeSec: Math.round(process.uptime())
+      },
+      timestamp: new Date().toISOString()
     };
   }
 
   /**
-   * Get full server resource metrics snapshot
+   * Get combined server metrics (Python Daemon + Node Process Heap + DB Pool)
    */
   async getResourceStats() {
-    const cpuUsage = await this.getCpuUsage();
-    const memory = this.getMemoryUsage();
-    const cpus = os.cpus();
-    const loadAvg = os.loadavg();
+    let metrics;
+    try {
+      metrics = await this.fetchFromPythonDaemon();
+    } catch (err) {
+      // Fallback to Node.js metrics if Python daemon is starting or unreachable
+      metrics = this.getNodeFallbackStats();
+    }
+
+    const processMem = process.memoryUsage();
+    metrics.memory.processRssMB = Math.round(processMem.rss / (1024 * 1024));
+    metrics.memory.processHeapUsedMB = Math.round(processMem.heapUsed / (1024 * 1024));
+    metrics.memory.processHeapTotalMB = Math.round(processMem.heapTotal / (1024 * 1024));
 
     let dbConnections = { total: 0, idle: 0, waiting: 0 };
     if (db.pool) {
@@ -70,31 +102,13 @@ class ResourceMonitorService {
         waiting: db.pool.waitingCount || 0
       };
     }
-
-    return {
-      enabled: env.ENABLE_RESOURCE_MONITORING,
-      cpu: {
-        usagePercent: cpuUsage,
-        cores: cpus.length,
-        model: cpus[0] ? cpus[0].model : 'CPU',
-        loadAvg: loadAvg.map(l => parseFloat(l.toFixed(2)))
-      },
-      memory,
-      system: {
-        platform: os.platform(),
-        arch: os.arch(),
-        hostname: os.hostname(),
-        systemUptimeSec: Math.round(os.uptime()),
-        processUptimeSec: Math.round(process.uptime()),
-        nodeVersion: process.version
-      },
-      dbConnections,
-      thresholds: {
-        cpuWarn: env.CPU_WARN_THRESHOLD,
-        memoryWarn: env.MEMORY_WARN_THRESHOLD
-      },
-      timestamp: new Date().toISOString()
+    metrics.dbConnections = dbConnections;
+    metrics.thresholds = {
+      cpuWarn: env.CPU_WARN_THRESHOLD || 85,
+      memoryWarn: env.MEMORY_WARN_THRESHOLD || 90
     };
+
+    return metrics;
   }
 }
 
