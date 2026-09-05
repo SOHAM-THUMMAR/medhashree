@@ -63,9 +63,7 @@ jobs:
         with:
           node-version: 20
           cache: 'pnpm'
-          cache-dependency-path: |
-            frontend/pnpm-lock.yaml
-            backend/pnpm-lock.yaml
+          cache-dependency-path: '**/pnpm-lock.yaml'
 
       # Verify Root Centralized .env Template
       - name: Verify Centralized Environment Template
@@ -75,11 +73,11 @@ jobs:
       # Install & Lint Backend
       - name: Install Backend Dependencies
         working-directory: ./backend
-        run: pnpm install || npm ci
+        run: pnpm install
 
       - name: Lint Backend
         working-directory: ./backend
-        run: pnpm run lint || npm run lint
+        run: pnpm run lint
 
       - name: Verify Backend Code Syntax
         working-directory: ./backend
@@ -88,15 +86,15 @@ jobs:
       # Install & Lint & Build Frontend
       - name: Install Frontend Dependencies
         working-directory: ./frontend
-        run: pnpm install || npm ci
+        run: pnpm install
 
       - name: Lint Frontend
         working-directory: ./frontend
-        run: pnpm run lint || npm run lint
+        run: pnpm run lint
 
       - name: Build Frontend (React + Vite)
         working-directory: ./frontend
-        run: pnpm run build || npm run build
+        run: pnpm run build
 
   # -------------------------------------------------------------
   # Job 3: Code Quality, Duplication & Dependency Check
