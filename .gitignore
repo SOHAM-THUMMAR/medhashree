@@ -70,6 +70,7 @@ temp_node_install/
 __pycache__/
 *.pyc
 backend/data/
+backend/logs/
 *.db
 *.db-shm
 *.db-wal

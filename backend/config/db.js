@@ -407,7 +407,10 @@ function runSqliteQuery(sql, params = []) {
       .replace(/BOOLEAN DEFAULT TRUE/gi, 'INTEGER DEFAULT 1')
       .replace(/BOOLEAN DEFAULT FALSE/gi, 'INTEGER DEFAULT 0')
       .replace(/IS TRUE/gi, '= 1')
-      .replace(/IS FALSE/gi, '= 0');
+      .replace(/IS FALSE/gi, '= 0')
+      .replace(/ILIKE/gi, 'LIKE')
+      .replace(/TO_CHAR\(([^,]+),\s*'[^']+'\)/gi, 'DATE($1)')
+      .replace(/CURRENT_DATE\s*-\s*INTERVAL\s*'(\d+)\s*days'/gi, "DATETIME('now', '-$1 days')");
 
     const trimmed = convertedSql.trim().toUpperCase();
     if (trimmed.startsWith('SELECT') || trimmed.startsWith('PRAGMA') || trimmed.startsWith('EXPLAIN')) {

@@ -1,23 +1,66 @@
-const db = require('../config/db');
+const fs = require('fs');
+const path = require('path');
 
-/**
- * Service for managing system and user activity logs in PostgreSQL
- */
+const LOGS_DIR = path.join(__dirname, '../logs');
+const LOGS_FILE = path.join(LOGS_DIR, 'activity.json');
+const MAX_IN_MEMORY_LOGS = 10000;
+
 class LoggerService {
+  constructor() {
+    this.logs = [];
+    this.nextLogId = 1;
+    this.flushTimer = null;
+    this._initStore();
+  }
+
   /**
-   * Log an activity entry asynchronously
-   * @param {Object} params
-   * @param {number|null} params.userId
-   * @param {string} [params.username]
-   * @param {string} [params.role]
-   * @param {string} params.action - Short descriptor (e.g. 'USER_LOGIN', 'QUIZ_SUBMIT', 'ADMIN_USER_DELETE')
-   * @param {string} [params.method] - HTTP method (GET, POST, etc.)
-   * @param {string} [params.endpoint] - Endpoint path
-   * @param {string} [params.ipAddress] - Request IP
-   * @param {string} [params.userAgent] - Client browser user agent
-   * @param {number} [params.statusCode] - HTTP status code
-   * @param {string} [params.severity] - 'info', 'warning', 'error', 'security'
-   * @param {Object|string} [params.details] - Additional contextual payload
+   * Initialize local directory and load JSON log store from disk
+   */
+  _initStore() {
+    try {
+      if (!fs.existsSync(LOGS_DIR)) {
+        fs.mkdirSync(LOGS_DIR, { recursive: true });
+      }
+
+      if (fs.existsSync(LOGS_FILE)) {
+        const raw = fs.readFileSync(LOGS_FILE, 'utf8');
+        if (raw.trim()) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            this.logs = parsed;
+            const maxId = parsed.reduce((max, item) => Math.max(max, item.log_id || 0), 0);
+            this.nextLogId = maxId + 1;
+          }
+        }
+      } else {
+        fs.writeFileSync(LOGS_FILE, JSON.stringify([], null, 2), 'utf8');
+      }
+    } catch (err) {
+      console.error('[LoggerService Init Error]', err.message);
+      this.logs = [];
+    }
+  }
+
+  /**
+   * Flush in-memory logs to JSON file (Debounced & Non-blocking)
+   */
+  _scheduleFlush() {
+    if (this.flushTimer) return;
+
+    this.flushTimer = setTimeout(() => {
+      this.flushTimer = null;
+      try {
+        fs.writeFile(LOGS_FILE, JSON.stringify(this.logs, null, 2), 'utf8', (err) => {
+          if (err) console.error('[LoggerService File Write Error]', err.message);
+        });
+      } catch (err) {
+        console.error('[LoggerService Flush Error]', err.message);
+      }
+    }, 500); // Flush every 500ms
+  }
+
+  /**
+   * Log an activity entry into JSON store
    */
   async log({
     userId = null,
@@ -35,29 +78,37 @@ class LoggerService {
     try {
       if (!action) return;
 
-      const formattedDetails = details ? (typeof details === 'object' ? JSON.stringify(details) : String(details)) : null;
+      const formattedDetails = details 
+        ? (typeof details === 'object' ? details : { info: String(details) })
+        : null;
 
-      await db.query(
-        `INSERT INTO activity_logs 
-         (user_id, username, role, action, method, endpoint, ip_address, user_agent, status_code, severity, details)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
-        [
-          userId,
-          username,
-          role,
-          action,
-          method,
-          endpoint,
-          ipAddress,
-          userAgent ? userAgent.substring(0, 500) : null,
-          statusCode,
-          severity,
-          formattedDetails
-        ]
-      );
+      const newLog = {
+        log_id: this.nextLogId++,
+        user_id: userId,
+        username: username || (userId ? `user_${userId}` : 'guest'),
+        role: role || 'guest',
+        action,
+        method,
+        endpoint,
+        ip_address: ipAddress || '127.0.0.1',
+        user_agent: userAgent ? String(userAgent).substring(0, 300) : null,
+        status_code: statusCode,
+        severity: severity || 'info',
+        details: formattedDetails,
+        created_at: new Date().toISOString()
+      };
+
+      // Unshift to front (most recent first)
+      this.logs.unshift(newLog);
+
+      // Cap in-memory size
+      if (this.logs.length > MAX_IN_MEMORY_LOGS) {
+        this.logs = this.logs.slice(0, MAX_IN_MEMORY_LOGS);
+      }
+
+      this._scheduleFlush();
     } catch (err) {
-      // Non-blocking log error
-      console.error('[LoggerService Error]', err.message);
+      console.error('[LoggerService Log Error]', err.message);
     }
   }
 
@@ -125,111 +176,118 @@ class LoggerService {
   }
 
   /**
-   * Fetch paginated logs for Admin Section
+   * Fetch paginated logs for Admin UI directly from JSON store
    */
   async getLogs({ page = 1, limit = 50, severity, action, search, startDate, endDate }) {
     try {
-      const offset = (page - 1) * limit;
-      const conditions = [];
-      const values = [];
-      let index = 1;
+      let filtered = [...this.logs];
 
+      // Severity filter
       if (severity && severity !== 'all') {
-        conditions.push(`severity = $${index++}`);
-        values.push(severity);
+        filtered = filtered.filter(l => l.severity === severity);
       }
 
+      // Action filter
       if (action && action !== 'all') {
-        conditions.push(`action ILIKE $${index++}`);
-        values.push(`%${action}%`);
+        const queryAction = action.toLowerCase();
+        filtered = filtered.filter(l => l.action && l.action.toLowerCase().includes(queryAction));
       }
 
+      // General Search filter
       if (search) {
-        conditions.push(`(action ILIKE $${index} OR username ILIKE $${index} OR endpoint ILIKE $${index} OR ip_address ILIKE $${index})`);
-        values.push(`%${search}%`);
-        index++;
+        const query = search.toLowerCase().trim();
+        filtered = filtered.filter(l =>
+          (l.action && l.action.toLowerCase().includes(query)) ||
+          (l.username && l.username.toLowerCase().includes(query)) ||
+          (l.endpoint && l.endpoint.toLowerCase().includes(query)) ||
+          (l.ip_address && l.ip_address.toLowerCase().includes(query)) ||
+          (l.details && JSON.stringify(l.details).toLowerCase().includes(query))
+        );
       }
 
+      // Date Range filters
       if (startDate) {
-        conditions.push(`created_at >= $${index++}`);
-        values.push(startDate);
+        const startMs = new Date(startDate).getTime();
+        filtered = filtered.filter(l => new Date(l.created_at).getTime() >= startMs);
       }
 
       if (endDate) {
-        conditions.push(`created_at <= $${index++}`);
-        values.push(endDate);
+        const endMs = new Date(endDate).getTime();
+        filtered = filtered.filter(l => new Date(l.created_at).getTime() <= endMs);
       }
 
-      const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
-
-      const countQuery = `SELECT COUNT(*) FROM activity_logs ${whereClause}`;
-      const dataQuery = `
-        SELECT log_id, user_id, username, role, action, method, endpoint, ip_address, user_agent, status_code, severity, details, created_at
-        FROM activity_logs
-        ${whereClause}
-        ORDER BY created_at DESC
-        LIMIT $${index++} OFFSET $${index++}
-      `;
-
-      const countResult = await db.query(countQuery, values);
-      const total = parseInt(countResult.rows[0].count, 10);
-
-      const dataValues = [...values, limit, offset];
-      const dataResult = await db.query(dataQuery, dataValues);
+      const total = filtered.length;
+      const pageNum = parseInt(page, 10) || 1;
+      const limitNum = parseInt(limit, 10) || 50;
+      const offset = (pageNum - 1) * limitNum;
+      const paginatedLogs = filtered.slice(offset, offset + limitNum);
 
       return {
         total,
-        page: parseInt(page, 10),
-        totalPages: Math.ceil(total / limit),
-        logs: dataResult.rows
+        page: pageNum,
+        totalPages: Math.ceil(total / limitNum) || 1,
+        logs: paginatedLogs
       };
     } catch (err) {
-      console.error('[LoggerService getLogs Error]', err);
-      throw err;
+      console.error('[LoggerService getLogs Error]', err.message);
+      return { total: 0, page: 1, totalPages: 1, logs: [] };
     }
   }
 
   /**
-   * Get log summary statistics
+   * Get log summary statistics directly from JSON store
    */
   async getStats() {
     try {
-      const totalResult = await db.query('SELECT COUNT(*) FROM activity_logs');
-      const todayResult = await db.query("SELECT COUNT(*) FROM activity_logs WHERE created_at >= CURRENT_DATE");
-      const securityResult = await db.query("SELECT COUNT(*) FROM activity_logs WHERE severity = 'security'");
-      const errorResult = await db.query("SELECT COUNT(*) FROM activity_logs WHERE severity = 'error'");
+      const todayStr = new Date().toISOString().split('T')[0];
 
-      const topActionsResult = await db.query(`
-        SELECT action, COUNT(*) as count 
-        FROM activity_logs 
-        GROUP BY action 
-        ORDER BY count DESC 
-        LIMIT 5
-      `);
+      let todayCount = 0;
+      let securityCount = 0;
+      let errorCount = 0;
+      const actionCounts = {};
+
+      for (const log of this.logs) {
+        if (log.created_at && log.created_at.startsWith(todayStr)) {
+          todayCount++;
+        }
+        if (log.severity === 'security') securityCount++;
+        if (log.severity === 'error') errorCount++;
+
+        if (log.action) {
+          actionCounts[log.action] = (actionCounts[log.action] || 0) + 1;
+        }
+      }
+
+      const topActions = Object.entries(actionCounts)
+        .map(([action, count]) => ({ action, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
 
       return {
-        totalLogs: parseInt(totalResult.rows[0].count, 10),
-        todayLogs: parseInt(todayResult.rows[0].count, 10),
-        securityEvents: parseInt(securityResult.rows[0].count, 10),
-        errorEvents: parseInt(errorResult.rows[0].count, 10),
-        topActions: topActionsResult.rows
+        totalLogs: this.logs.length,
+        todayLogs: todayCount,
+        securityEvents: securityCount,
+        errorEvents: errorCount,
+        topActions
       };
     } catch (err) {
-      console.error('[LoggerService getStats Error]', err);
+      console.error('[LoggerService getStats Error]', err.message);
       return { totalLogs: 0, todayLogs: 0, securityEvents: 0, errorEvents: 0, topActions: [] };
     }
   }
 
   /**
-   * Prune activity logs older than retention days (default 60 days) to optimize DB storage
+   * Prune activity logs older than retention days
    */
   async pruneOldLogs(days = 60) {
     try {
-      const res = await db.query(
-        "DELETE FROM activity_logs WHERE created_at < NOW() - (INTERVAL '1 day' * $1)",
-        [days]
-      );
-      return { deletedCount: res.rowCount };
+      const cutoffMs = Date.now() - (days * 24 * 60 * 60 * 1000);
+      const initialCount = this.logs.length;
+      this.logs = this.logs.filter(l => new Date(l.created_at).getTime() >= cutoffMs);
+      const deletedCount = initialCount - this.logs.length;
+
+      this._scheduleFlush();
+      return { deletedCount };
     } catch (err) {
       console.error('[LoggerService Prune Error]', err.message);
       return { deletedCount: 0 };
