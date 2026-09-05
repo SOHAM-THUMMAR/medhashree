@@ -35,8 +35,8 @@ export default function LogInspectorModal({ selectedLog, setSelectedLog, getSeve
               {getSeverityBadge(selectedLog.severity)}
             </div>
             <div>
-              <span className="text-slate-500 block uppercase text-[10px]">User</span>
-              <span className="text-indigo-300 font-semibold">{selectedLog.username || 'Guest'} (ID: {selectedLog.user_id || 'N/A'})</span>
+              <span className="text-slate-500 block uppercase text-[10px]">User & Email</span>
+              <span className="text-indigo-300 font-semibold">{selectedLog.email || selectedLog.username || 'Guest'} {selectedLog.username ? `(@${selectedLog.username.replace(/^@/, '')})` : ''}</span>
             </div>
             <div>
               <span className="text-slate-500 block uppercase text-[10px]">IP Address</span>

@@ -65,6 +65,7 @@ class LoggerService {
   async log({
     userId = null,
     username = null,
+    email = null,
     role = null,
     action,
     method = null,
@@ -82,10 +83,13 @@ class LoggerService {
         ? (typeof details === 'object' ? details : { info: String(details) })
         : null;
 
+      const userEmail = email || details?.email || (typeof details === 'object' && details?.email) || null;
+
       const newLog = {
         log_id: this.nextLogId++,
         user_id: userId,
         username: username || (userId ? `user_${userId}` : 'guest'),
+        email: userEmail,
         role: role || 'guest',
         action,
         method,
@@ -116,6 +120,7 @@ class LoggerService {
     return this.log({
       userId: req?.user?.userId || null,
       username: req?.user?.username || null,
+      email: req?.user?.email || req?.body?.email || details?.email || null,
       role: req?.user?.role || null,
       action,
       method: req?.method,
@@ -132,6 +137,7 @@ class LoggerService {
     return this.log({
       userId: req?.user?.userId || null,
       username: req?.user?.username || null,
+      email: req?.user?.email || req?.body?.email || details?.email || null,
       role: req?.user?.role || null,
       action,
       method: req?.method,
@@ -147,6 +153,7 @@ class LoggerService {
     return this.log({
       userId: req?.user?.userId || null,
       username: req?.user?.username || null,
+      email: req?.user?.email || req?.body?.email || null,
       role: req?.user?.role || null,
       action,
       method: req?.method,
@@ -163,6 +170,7 @@ class LoggerService {
     return this.log({
       userId: req?.user?.userId || null,
       username: req?.user?.username || null,
+      email: req?.user?.email || req?.body?.email || details?.email || null,
       role: req?.user?.role || null,
       action,
       method: req?.method,
@@ -193,10 +201,11 @@ class LoggerService {
         filtered = filtered.filter(l => l.action && l.action.toLowerCase().includes(queryAction));
       }
 
-      // General Search filter
+      // General Search filter (checking email, username, action, ip_address, endpoint, details)
       if (search) {
         const query = search.toLowerCase().trim();
         filtered = filtered.filter(l =>
+          (l.email && l.email.toLowerCase().includes(query)) ||
           (l.action && l.action.toLowerCase().includes(query)) ||
           (l.username && l.username.toLowerCase().includes(query)) ||
           (l.endpoint && l.endpoint.toLowerCase().includes(query)) ||

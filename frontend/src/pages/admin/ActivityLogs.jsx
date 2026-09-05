@@ -430,10 +430,16 @@ function ActivityLogs() {
                     <td className="py-3 px-4 whitespace-nowrap">{getSeverityBadge(log.severity)}</td>
                     <td className="py-3 px-4 font-semibold text-slate-100 whitespace-nowrap">{log.action}</td>
                     <td className="py-3 px-4 whitespace-nowrap">
-                      {log.username ? (
-                        <div>
-                          <span className="font-medium text-indigo-300">{log.username}</span>
-                          {log.role && <span className="text-[10px] text-slate-500 block capitalize">{log.role}</span>}
+                      {log.email || log.username ? (
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-indigo-300 text-xs">
+                            {log.email || log.username}
+                          </span>
+                          {(log.username || log.role) && (
+                            <span className="text-[10px] text-slate-400">
+                              {log.username && `@${log.username.replace(/^@/, '')}`} • <span className="capitalize">{log.role || 'user'}</span>
+                            </span>
+                          )}
                         </div>
                       ) : (
                         <span className="text-slate-500 italic">Guest</span>

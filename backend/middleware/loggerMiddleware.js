@@ -37,14 +37,22 @@ const activityLoggerMiddleware = (req, res, next) => {
     if (req.originalUrl.includes('/api/auth/forgot-password')) action = 'PASSWORD_RESET_REQUEST';
     if (req.originalUrl.includes('/api/admin')) action = `ADMIN_${req.method}_${req.path.replace(/\//g, '_').toUpperCase()}`;
 
-    // Skip logging high-frequency GET polling if 200 OK
-    if (req.method === 'GET' && statusCode < 400 && (req.originalUrl.includes('/leaderboard') || req.originalUrl.includes('/news'))) {
+    // Skip logging high-frequency GET polling calls to keep logs clean and meaningful
+    if (req.method === 'GET' && (
+      req.originalUrl.includes('/online-users') ||
+      req.originalUrl.includes('/resource-stats') ||
+      req.originalUrl.includes('/activity-logs') ||
+      req.originalUrl.includes('/alerts/config') ||
+      req.originalUrl.includes('/leaderboard') ||
+      req.originalUrl.includes('/news')
+    )) {
       return;
     }
 
     loggerService.log({
       userId: req.user?.userId || null,
       username: req.user?.username || null,
+      email: req.user?.email || req.body?.email || null,
       role: req.user?.role || null,
       action,
       method: req.method,

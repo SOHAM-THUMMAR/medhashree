@@ -43,7 +43,7 @@ exports.register = async (req, res) => {
     });
 
     // 5. Generate token
-    const token = generateToken({ userId: newUser.user_id, role: newUser.role });
+    const token = generateToken({ userId: newUser.user_id, role: newUser.role, email: newUser.email, username: newUser.username });
 
     res.status(201).json({
       success: true,
@@ -224,7 +224,7 @@ exports.login = async (req, res) => {
     }
 
     // 5. Regular User Token Generation
-    const token = generateToken({ userId: user.user_id, role: user.role });
+    const token = generateToken({ userId: user.user_id, role: user.role, email: user.email, username: user.username });
     delete user.password_hash;
 
     res.status(200).json({
@@ -289,7 +289,7 @@ exports.verifyAdminOtp = async (req, res) => {
     // Mark OTP as used
     await db.query('UPDATE password_resets SET is_used = TRUE WHERE id = $1', [record.id]);
 
-    const token = generateToken({ userId: user.user_id, role: user.role });
+    const token = generateToken({ userId: user.user_id, role: user.role, email: user.email, username: user.username });
     delete user.password_hash;
 
     loggerService.logInfo('ADMIN_LOGIN_SUCCESS', req, { userId: user.user_id, email: user.email });
@@ -481,7 +481,7 @@ exports.googleLogin = async (req, res) => {
     }
 
     // Generate token
-    const token = generateToken({ userId: user.user_id, role: user.role });
+    const token = generateToken({ userId: user.user_id, role: user.role, email: user.email, username: user.username });
     delete user.password_hash;
 
     res.status(200).json({
